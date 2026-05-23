@@ -61,21 +61,12 @@ rails that every later feature will rely on.
 
 ### Status
 
-- `M0.1 Context Hardening` is complete.
-- The remaining work in Phase 0 should now be expressed as small unit specs
-  that can be implemented and verified independently.
+- Phase 0 starts from explicit foundation decisions and should be expressed as
+  small unit specs that can be implemented and verified independently.
 
 ### Milestones
 
-#### M0.1 Context Hardening (Complete)
-
-- Replace placeholders in `ui-context.md`, `code-standards.md`, and
-  `ai-workflow-rules.md` with project-specific decisions.
-- Confirm which architecture track is active by default.
-- Define the first implementation units clearly enough that feature work does
-  not require guessing.
-
-#### M0.2 Foundation Decisions Lock
+#### M0.1 Foundation Decisions Lock
 
 - Choose the JavaScript package-manager and repo-shape approach.
 - Choose the frontend test baseline for the first frontend surface.
@@ -84,7 +75,7 @@ rails that every later feature will rely on.
 - Lock baseline runtime assumptions such as Node, Python, Docker, and shared
   environment-file conventions so bootstrap work does not fork.
 
-#### M0.3 Repo Bootstrap and Surface Skeletons
+#### M0.2 Repo Bootstrap and Surface Skeletons
 
 - Create `apps/storefront`, `apps/admin`, `services/commerce-api`,
   `services/worker`, `platform/keycloak`, `platform/jenkins`,
@@ -94,7 +85,7 @@ rails that every later feature will rely on.
 - Add root repo hygiene, onboarding docs, and only the shared config that the
   active surfaces actually need.
 
-#### M0.4 Storefront Theme and Frontend Shell Baseline
+#### M0.3 Storefront Theme and Frontend Shell Baseline
 
 - Create the first theme-token and typography foundation in the storefront.
 - Add a minimal `apps/storefront` shell that proves the approved visual
@@ -102,7 +93,7 @@ rails that every later feature will rely on.
 - Keep the shell static or mocked; do not block it on live backend data.
 - Extract shared UI structure later only if the admin app reaches real reuse.
 
-#### M0.5 API, Contracts, Worker, and Observability Skeletons
+#### M0.4 API, Contracts, Worker, and Observability Skeletons
 
 - Create `services/commerce-api` with app bootstrap, health endpoint, settings,
   dependency seams, and domain-module layout.
@@ -111,7 +102,7 @@ rails that every later feature will rely on.
 - Create `services/worker` and the first observability seams with local logging,
   correlation, and worker bootstrap support.
 
-#### M0.6 Local Platform Runtime
+#### M0.5 Local Platform Runtime
 
 - Add Docker Compose for PostgreSQL, Redis, Keycloak, and supporting local
   services.
@@ -119,14 +110,14 @@ rails that every later feature will rely on.
 - Ensure the app shells and backend skeletons can boot against local
   dependencies even before domain features exist.
 
-#### M0.7 Delivery and Docs Baseline
+#### M0.6 Delivery and Docs Baseline
 
 - Add Jenkins pipeline-as-code, ADR template, and initial runbook structure.
 - Ensure local build and CI validation paths are defined.
 - Make verification commands explicit for every Phase 0 unit so future work can
   reuse them.
 
-#### M0.8 AWS Bootstrap
+#### M0.7 AWS Bootstrap
 
 - Add Terraform foundations for networking, ECR, ECS, RDS, Redis, S3, secrets,
   and environment separation.
@@ -353,7 +344,7 @@ understood.
 
 ## Suggested Next Spec Queue
 
-These are the next Phase 0 unit specs, with the first two now authored:
+These are the next Phase 0 unit specs, with the first three now authored:
 
 1. `phase-0/01-foundation-decisions.md`
    Lock package manager, frontend test baseline, Python session model, and
@@ -361,31 +352,35 @@ These are the next Phase 0 unit specs, with the first two now authored:
 2. `phase-0/02-repo-bootstrap.md`
    Create the initial repo skeleton, first runnable surfaces, and canonical
    directory structure without workspace orchestration.
-3. `phase-0/03-storefront-theme-foundation.md`
+3. `phase-0/03-terraform-setup.md`
+   Create the initial Terraform layout, environment composition strategy,
+   remote-state approach, and shared AWS foundation modules.
+4. `phase-0/04-storefront-theme-foundation.md`
    Create semantic tokens, font wiring, and the first storefront theme
    foundation, with shared extraction deferred.
-4. `phase-0/04-storefront-shell.md`
+5. `phase-0/05-storefront-shell.md`
    Create the customer-facing app shell with static placeholder routes and the
    approved visual language.
-5. `phase-0/05-admin-shell.md`
+6. `phase-0/06-admin-shell.md`
    Create the operator app shell with the admin theme and route/layout
    scaffolding.
-6. `phase-0/06-contracts-and-boundary-conventions.md`
+7. `phase-0/07-contracts-and-boundary-conventions.md`
    Create the initial contract structure and schema/versioning conventions near
    the owning surfaces.
-7. `phase-0/07-commerce-api-skeleton.md`
+8. `phase-0/08-commerce-api-skeleton.md`
    Create FastAPI bootstrap, settings, health route, router composition, and a
    minimal test baseline.
-8. `phase-0/08-worker-and-observability-skeleton.md`
+9. `phase-0/09-worker-and-observability-skeleton.md`
    Create the worker entrypoint plus logging, metrics, and correlation seams.
-9. `phase-0/09-local-platform-runtime.md`
+10. `phase-0/10-local-platform-runtime.md`
    Add Docker Compose, local bootstrap scripts, and developer setup
    instructions for PostgreSQL, Redis, and Keycloak.
-10. `phase-0/10-ci-and-docs-baseline.md`
+11. `phase-0/11-ci-and-docs-baseline.md`
    Add Jenkins skeleton, repo quality gates, ADR template, and runbook
    scaffolding.
-11. `phase-0/11-terraform-foundation.md`
-   Add the initial Terraform module/environment layout and validation path.
+12. `phase-0/12-terraform-service-expansion.md`
+   Expand the Terraform baseline into deployable service and data-plane
+   infrastructure once the application surfaces are ready.
 
 ## Decision Gates
 

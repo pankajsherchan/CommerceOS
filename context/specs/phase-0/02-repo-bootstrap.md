@@ -106,18 +106,18 @@ workspace tooling, or full implementations for every planned surface.
 
 ## Verify when done
 
-- [ ] Root repo docs and hygiene files exist without `pnpm` workspace or
+- [x] Root repo docs and hygiene files exist without `pnpm` workspace or
       `turbo` config.
-- [ ] `apps/storefront` boots as a minimal placeholder Next.js app with
+- [x] `apps/storefront` boots as a minimal placeholder Next.js app with
       app-local commands.
-- [ ] `services/commerce-api` exists as an import-safe Python package skeleton
+- [x] `services/commerce-api` exists as an import-safe Python package skeleton
       only, with no API behavior added yet.
-- [ ] `apps/admin`, `services/worker`, `platform/keycloak`,
+- [x] `apps/admin`, `services/worker`, `platform/keycloak`,
       `platform/jenkins`, `infra/terraform`, and `docs/` all exist with
       intentional placeholders.
-- [ ] `apps/storefront` local lint, typecheck, test, and build commands
+- [x] `apps/storefront` local lint, typecheck, test, and build commands
       succeed.
-- [ ] Root docs explain prerequisites, per-surface commands, and the deliberate
+- [x] Root docs explain prerequisites, per-surface commands, and the deliberate
       absence of workspace orchestration.
-- [ ] `context/progress-tracker.md` is updated to reflect completion of this
+- [x] `context/progress-tracker.md` is updated to reflect completion of this
       unit and the next queued unit.
