@@ -83,6 +83,11 @@ changes:
 Always update `progress-tracker.md` after every meaningful implementation or
 documentation change so the next session starts from reality instead of memory.
 
+Keep `progress-tracker.md` concise. It should show phase checklist status, the
+current or next unit, and only blocking gaps or open questions. Do not use it as
+a changelog or memory dump for detailed implementation summaries; those details
+belong in the unit spec, docs, commits, or the final handoff for the work.
+
 ## Before Moving to the Next Unit
 
 1. The current unit works end to end within its defined scope

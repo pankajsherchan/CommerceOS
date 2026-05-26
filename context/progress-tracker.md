@@ -6,28 +6,26 @@
 - [x] 02 Repo Bootstrap
 - [x] 03 Setup Storefront Pages
 - [x] 04 Setup Auth
-- [ ] 05 Setup API Endpoints
+- [x] 05 Setup API Endpoints
 
-### Completed: 04 Setup Auth
+Current unit: 05 Setup API Endpoints
 
-- Added Keycloak OIDC authorization-code flow with PKCE for storefront sign up,
-  sign in, callback handling, and sign out.
-- Added signed, HTTP-only storefront session cookies readable from server
-  components and route handlers.
-- Protected checkout and account routes with server-side session checks while
-  leaving home, catalog, product detail, and cart browsing public for guests.
-- Added a simple authenticated account dashboard that displays Keycloak session
-  identity details without introducing customer persistence.
-- Added local Keycloak realm/client import config and storefront auth
-  environment documentation.
-- Added a local Docker Compose Keycloak runtime for end-to-end storefront auth
-  testing against the imported `commerceos` realm.
+Status: implemented and verified.
 
-### Next: 05 Setup API Endpoints
+Completed scope:
 
-- Introduce the first commerce API slice without moving auth enforcement,
-  customer account persistence, order history, or payment behavior ahead of
-  their planned units.
+- Added the first FastAPI app with health, catalog, product detail, cart read,
+  and placeholder-authenticated cart item write/update/remove/clear endpoints.
+- Kept catalog and cart data in memory for Phase 0, with explicit Pydantic
+  request and response models.
+- Wired storefront catalog/product/cart reads through a small typed API client.
+- Wired storefront cart add, quantity, remove, and sample-order clear actions
+  through route handlers that proxy to the commerce API.
+- Removed storefront catalog/cart fixture fallbacks; failed API list reads now
+  resolve to empty arrays, and cart display enriches lines from API-loaded
+  products.
+
+Next unit: 06 Setup Logger.
 
 ## Phase 1
 

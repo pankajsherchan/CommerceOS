@@ -44,6 +44,23 @@ Expected local settings:
   `http://localhost:3001/*`
 - Required scopes: `openid email profile`
 
+## Local API
+
+Run the commerce API separately and point the storefront at it:
+
+```bash
+cd services/commerce-api
+uv sync
+uv run uvicorn commerce_api.main:app --reload
+```
+
+Set `COMMERCE_API_BASE_URL=http://localhost:8000` in
+`apps/storefront/.env.local`. Storefront catalog and initial cart reads use the
+API directly. If the API is unavailable, list reads resolve to empty arrays and
+product detail reads resolve to not found. Interactive add, quantity, remove,
+and sample-order cart clear actions are proxied through storefront route
+handlers to the commerce API.
+
 ## Scope
 
 This app currently contains:
@@ -51,11 +68,11 @@ This app currently contains:
 - a premium storefront shell with semantic theme tokens and project typography
 - a mocked home page and catalog listing experience
 - product detail, cart, checkout, and order confirmation routes
-- app-local mocked catalog and cart state with client-side quantity editing
+- API-backed catalog reads and cart mutations
 - Keycloak-backed sign up, sign in, sign out, and server-readable session state
 - protected checkout and account dashboard routes
 - route-level loading and not-found handling
 - Vitest coverage for the storefront home page
 
-Live API integration, customer profile persistence, taxes, shipping quotes, and
-Stripe payments are deliberately deferred to later units.
+Customer profile persistence, taxes, shipping quotes, and Stripe payments are
+deliberately deferred to later units.

@@ -3,8 +3,11 @@ import { notFound } from "next/navigation";
 
 import { AddToCartForm } from "@/components/add-to-cart-form";
 import { ProductCard } from "@/components/product-card";
+import {
+  getStorefrontProductBySlug,
+  getStorefrontRelatedProducts,
+} from "@/lib/commerce-api";
 import { formatMoney } from "@/lib/money";
-import { getProductBySlug, getRelatedProducts } from "@/lib/storefront-data";
 
 type ProductDetailPageProps = {
   params: Promise<{
@@ -16,13 +19,13 @@ export default async function ProductDetailPage({
   params,
 }: ProductDetailPageProps) {
   const { slug } = await params;
-  const product = getProductBySlug(slug);
+  const product = await getStorefrontProductBySlug(slug);
 
   if (!product) {
     notFound();
   }
 
-  const relatedProducts = getRelatedProducts(product);
+  const relatedProducts = await getStorefrontRelatedProducts(product);
   const inventoryClassName = {
     "in-stock": "inventory-copy is-success",
     "low-stock": "inventory-copy is-warning",

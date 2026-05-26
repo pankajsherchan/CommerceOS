@@ -7,6 +7,8 @@ import { formatMoney } from "@/lib/money";
 
 export function CartPageView() {
   const {
+    cartErrorMessage,
+    isUpdating,
     lineCount,
     lines,
     removeItem,
@@ -38,6 +40,11 @@ export function CartPageView() {
         <div>
           <p className="eyebrow">Cart</p>
           <h1 className="section-title">Review your selected items.</h1>
+          {cartErrorMessage ? (
+            <p aria-live="polite" className="inventory-copy is-error">
+              {cartErrorMessage}
+            </p>
+          ) : null}
         </div>
 
         <div className="surface-panel">
@@ -64,6 +71,7 @@ export function CartPageView() {
                       <button
                         aria-label={`Decrease quantity for ${line.product.name}`}
                         className="quantity-button"
+                        disabled={isUpdating}
                         onClick={() =>
                           updateQuantity(
                             line.product.slug,
@@ -79,6 +87,7 @@ export function CartPageView() {
                       <button
                         aria-label={`Increase quantity for ${line.product.name}`}
                         className="quantity-button"
+                        disabled={isUpdating}
                         onClick={() =>
                           updateQuantity(line.product.slug, line.size, line.quantity + 1)
                         }
@@ -88,6 +97,7 @@ export function CartPageView() {
                       </button>
                       <button
                         className="button-secondary"
+                        disabled={isUpdating}
                         onClick={() => removeItem(line.product.slug, line.size)}
                         type="button"
                       >

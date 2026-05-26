@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
 
-import { CartProvider } from "@/components/cart-provider";
+import { CartProviderInner } from "@/components/cart-provider";
 import { StorefrontShell } from "@/components/storefront-shell";
+import { getStorefrontCartLines, getStorefrontProducts } from "@/lib/commerce-api";
 
 import "./globals.css";
 
@@ -34,17 +35,25 @@ const rootClassName = [
   "h-full antialiased",
 ].join(" ");
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const [initialCartLines, initialProducts] = await Promise.all([
+    getStorefrontCartLines(),
+    getStorefrontProducts(),
+  ]);
+
   return (
     <html lang="en" className={rootClassName}>
       <body>
-        <CartProvider>
+        <CartProviderInner
+          initialLines={initialCartLines}
+          initialProducts={initialProducts}
+        >
           <StorefrontShell>{children}</StorefrontShell>
-        </CartProvider>
+        </CartProviderInner>
       </body>
     </html>
   );

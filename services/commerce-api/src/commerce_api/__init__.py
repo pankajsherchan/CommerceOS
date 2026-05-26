@@ -1,4 +1,4 @@
-"""CommerceOS commerce API package skeleton."""
+"""CommerceOS commerce API."""
 
 __all__ = ["__version__"]
 

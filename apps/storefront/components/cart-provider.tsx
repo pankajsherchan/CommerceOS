@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useMemo,
   useState,
@@ -9,10 +10,16 @@ import {
 } from "react";
 
 import {
+  addCartItem,
+  clearCart as clearRemoteCart,
+  removeCartItem,
+  updateCartItem,
+} from "@/lib/cart-api";
+import {
   buildCartSummary,
   createEnrichedCartLines,
-  initialCartLines,
   type CartLine,
+  type EnrichedCartLine,
   type Product,
 } from "@/lib/storefront-data";
 
@@ -23,83 +30,125 @@ type AddItemInput = {
 
 type CartContextValue = {
   lineCount: number;
-  lines: ReturnType<typeof createEnrichedCartLines>;
+  lines: EnrichedCartLine[];
   subtotalAmount: number;
   shippingAmount: number;
   totalAmount: number;
-  addItem: (input: AddItemInput) => void;
-  clearCart: () => void;
+  addItem: (input: AddItemInput) => Promise<boolean>;
+  cartErrorMessage: string | null;
+  clearCart: () => Promise<boolean>;
+  isUpdating: boolean;
   lastAddedProductName: string | null;
-  removeItem: (productSlug: string, size: string) => void;
-  updateQuantity: (productSlug: string, size: string, quantity: number) => void;
+  removeItem: (productSlug: string, size: string) => Promise<boolean>;
+  updateQuantity: (
+    productSlug: string,
+    size: string,
+    quantity: number,
+  ) => Promise<boolean>;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: ReactNode }) {
-  const [lines, setLines] = useState<CartLine[]>(initialCartLines);
+export function CartProviderInner({
+  children,
+  initialLines,
+  initialProducts,
+}: {
+  children: ReactNode;
+  initialLines: CartLine[];
+  initialProducts: Product[];
+}) {
+  const [lines, setLines] = useState<CartLine[]>(initialLines);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [cartErrorMessage, setCartErrorMessage] = useState<string | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
   const [lastAddedProductName, setLastAddedProductName] = useState<string | null>(
     null,
   );
 
-  const lineItems = useMemo(() => createEnrichedCartLines(lines), [lines]);
+  const lineItems = useMemo(
+    () => createEnrichedCartLines(lines, products),
+    [lines, products],
+  );
   const summary = useMemo(() => buildCartSummary(lineItems), [lineItems]);
+
+  const runCartMutation = useCallback(
+    async (
+      mutation: () => Promise<CartLine[]>,
+      onSuccess?: () => void,
+    ) => {
+      setIsUpdating(true);
+      setCartErrorMessage(null);
+
+      try {
+        const nextLines = await mutation();
+        setLines(nextLines);
+        onSuccess?.();
+        return true;
+      } catch {
+        setCartErrorMessage("Cart update failed. Make sure the commerce API is running.");
+        return false;
+      } finally {
+        setIsUpdating(false);
+      }
+    },
+    [],
+  );
 
   const value = useMemo<CartContextValue>(
     () => ({
-      addItem: ({ product, size }) => {
-        setLines((currentLines) => {
-          const existingLine = currentLines.find(
-            (line) => line.productSlug === product.slug && line.size === size,
-          );
+      addItem: async ({ product, size }) => {
+        return runCartMutation(
+          () =>
+            addCartItem({
+              productSlug: product.slug,
+              quantity: 1,
+              size,
+            }),
+          () => {
+            setLastAddedProductName(product.name);
+            setProducts((currentProducts) => {
+              if (currentProducts.some((currentProduct) => currentProduct.slug === product.slug)) {
+                return currentProducts;
+              }
 
-          if (!existingLine) {
-            return [...currentLines, { productSlug: product.slug, quantity: 1, size }];
-          }
-
-          return currentLines.map((line) =>
-            line.productSlug === product.slug && line.size === size
-              ? { ...line, quantity: line.quantity + 1 }
-              : line,
-          );
-        });
-        setLastAddedProductName(product.name);
+              return [...currentProducts, product];
+            });
+          },
+        );
       },
-      clearCart: () => setLines([]),
+      cartErrorMessage,
+      clearCart: async () => {
+        return runCartMutation(() => clearRemoteCart());
+      },
+      isUpdating,
       lastAddedProductName,
       lineCount: summary.lineCount,
       lines: lineItems,
-      removeItem: (productSlug, size) => {
-        setLines((currentLines) =>
-          currentLines.filter(
-            (line) => !(line.productSlug === productSlug && line.size === size),
-          ),
-        );
+      removeItem: async (productSlug, size) => {
+        return runCartMutation(() => removeCartItem({ productSlug, size }));
       },
       shippingAmount: summary.shippingAmount,
       subtotalAmount: summary.subtotalAmount,
       totalAmount: summary.totalAmount,
-      updateQuantity: (productSlug, size, quantity) => {
+      updateQuantity: async (productSlug, size, quantity) => {
         if (quantity <= 0) {
-          setLines((currentLines) =>
-            currentLines.filter(
-              (line) => !(line.productSlug === productSlug && line.size === size),
-            ),
-          );
-
-          return;
+          return runCartMutation(() => removeCartItem({ productSlug, size }));
         }
 
-        setLines((currentLines) =>
-          currentLines.map((line) =>
-            line.productSlug === productSlug && line.size === size
-              ? { ...line, quantity }
-              : line,
-          ),
+        return runCartMutation(() =>
+          updateCartItem({ productSlug, quantity, size }),
         );
       },
     }),
-    [lastAddedProductName, lineItems, summary],
+    [
+      cartErrorMessage,
+      isUpdating,
+      lastAddedProductName,
+      lineItems,
+      runCartMutation,
+      summary,
+    ],
   );
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;

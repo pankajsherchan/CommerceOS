@@ -1,11 +1,12 @@
 import Link from "next/link";
 
 import { ProductCard } from "@/components/product-card";
-import { getFeaturedProducts, storefrontMerch } from "@/lib/storefront-data";
+import { getStorefrontFeaturedProducts } from "@/lib/commerce-api";
+import { storefrontMerch } from "@/lib/storefront-data";
 
-const featuredProducts = getFeaturedProducts();
+export default async function Home() {
+  const featuredProducts = await getStorefrontFeaturedProducts();
 
-export default function Home() {
   return (
     <main className="shell-container storefront-stack storefront-section">
       <section className="hero-grid">
@@ -40,7 +41,7 @@ export default function Home() {
           </Link>
         </div>
         <div className="product-grid">
-          {featuredProducts.map((product) => (
+            {featuredProducts.map((product) => (
             <ProductCard key={product.slug} product={product} />
           ))}
         </div>

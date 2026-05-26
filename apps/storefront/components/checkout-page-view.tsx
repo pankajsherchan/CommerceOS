@@ -8,8 +8,16 @@ import { formatMoney } from "@/lib/money";
 
 export function CheckoutPageView() {
   const router = useRouter();
-  const { clearCart, lineCount, lines, shippingAmount, subtotalAmount, totalAmount } =
-    useCart();
+  const {
+    cartErrorMessage,
+    clearCart,
+    isUpdating,
+    lineCount,
+    lines,
+    shippingAmount,
+    subtotalAmount,
+    totalAmount,
+  } = useCart();
 
   if (lineCount === 0) {
     return (
@@ -31,15 +39,23 @@ export function CheckoutPageView() {
     <div className="checkout-layout">
       <form
         className="storefront-stack"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault();
-          clearCart();
-          router.push("/order/confirmation");
+          const wasCleared = await clearCart();
+
+          if (wasCleared) {
+            router.push("/order/confirmation");
+          }
         }}
       >
         <div>
           <p className="eyebrow">Checkout</p>
           <h1 className="section-title">Complete the mocked purchase flow.</h1>
+          {cartErrorMessage ? (
+            <p aria-live="polite" className="inventory-copy is-error">
+              {cartErrorMessage}
+            </p>
+          ) : null}
         </div>
 
         <section className="checkout-section">
@@ -109,8 +125,8 @@ export function CheckoutPageView() {
           </p>
         </section>
 
-        <button className="submit-button" type="submit">
-          Place sample order
+        <button className="submit-button" disabled={isUpdating} type="submit">
+          {isUpdating ? "Placing sample order..." : "Place sample order"}
         </button>
       </form>
 

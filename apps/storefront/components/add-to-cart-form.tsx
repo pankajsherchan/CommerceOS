@@ -8,7 +8,7 @@ import type { Product } from "@/lib/storefront-data";
 export function AddToCartForm({ product }: { product: Product }) {
   const [selectedSize, setSelectedSize] = useState(product.sizes[0] ?? "Standard");
   const [showAddedMessage, setShowAddedMessage] = useState(false);
-  const { addItem, lastAddedProductName } = useCart();
+  const { addItem, cartErrorMessage, isUpdating, lastAddedProductName } = useCart();
 
   const isSoldOut = product.inventoryStatus === "sold-out";
 
@@ -43,19 +43,22 @@ export function AddToCartForm({ product }: { product: Product }) {
         <div className="detail-actions">
           <button
             className="button-primary"
-            disabled={isSoldOut}
-            onClick={() => {
-              addItem({ product, size: selectedSize });
+            disabled={isSoldOut || isUpdating}
+            onClick={async () => {
+              await addItem({ product, size: selectedSize });
               setShowAddedMessage(true);
             }}
             type="button"
           >
-            {isSoldOut ? "Sold out" : "Add to cart"}
+            {isSoldOut ? "Sold out" : isUpdating ? "Adding..." : "Add to cart"}
           </button>
         </div>
 
-        <p aria-live="polite" className="inventory-copy is-success">
-          {feedbackMessage ?? "Local cart state only for this phase."}
+        <p
+          aria-live="polite"
+          className={`inventory-copy ${cartErrorMessage ? "is-error" : "is-success"}`}
+        >
+          {cartErrorMessage ?? feedbackMessage ?? "Cart updates sync with the API."}
         </p>
       </div>
     </div>
