@@ -1,9 +1,18 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Manrope } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Manrope } from "next/font/google";
+
+import { CartProvider } from "@/components/cart-provider";
+import { StorefrontShell } from "@/components/storefront-shell";
+
 import "./globals.css";
 
 const manrope = Manrope({
   variable: "--font-sans",
+  subsets: ["latin"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-display",
   subsets: ["latin"],
 });
 
@@ -15,11 +24,12 @@ const ibmPlexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "CommerceOS Storefront",
-  description: "Phase 0 storefront bootstrap for CommerceOS.",
+  description: "Mocked premium storefront flows for CommerceOS phase 1.",
 };
 
 const rootClassName = [
   manrope.variable,
+  fraunces.variable,
   ibmPlexMono.variable,
   "h-full antialiased",
 ].join(" ");
@@ -31,7 +41,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={rootClassName}>
-      <body>{children}</body>
+      <body>
+        <CartProvider>
+          <StorefrontShell>{children}</StorefrontShell>
+        </CartProvider>
+      </body>
     </html>
   );
 }
