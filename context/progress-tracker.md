@@ -12,13 +12,17 @@
 - [ ] 08 Setup Jenkins
   - [ ] 08A Jenkins CI and Image Publishing
   - [ ] 08B Remote Terraform State and Dev Deploy
+  - [ ] 08C Trigger Jenkins Pipeline From GitHub
 - [ ] 09 Setup Logger
 
-Current unit: 08B Remote Terraform State and Dev Deploy
+Current unit: 08C Trigger Jenkins Pipeline From GitHub
 
-Status: 08B implemented and locally verified where possible; real Jenkins/AWS
-execution is still pending for image push, remote-state bootstrap, Terraform
-apply, ECS migration, ECS rollout, and ALB smoke tests.
+Status: 08C is implemented in the Jenkinsfile and Jenkins operator docs. Live
+GitHub webhook or SCM-polling verification is still pending because the local
+Jenkins job, tunnel, and Jenkins credentials must be configured outside the
+repository. 08B is implemented and locally verified where possible; real
+Jenkins/AWS execution is still pending for image push, remote-state bootstrap,
+Terraform apply, ECS migration, ECS rollout, and ALB smoke tests.
 
 Completed scope:
 
@@ -61,6 +65,15 @@ Completed scope:
 - Documented local Jenkins deploy assumptions, backend bootstrap/state
   migration, deploy parameters, rollback notes, and optional Keycloak
   configuration.
+- Detailed the Unit 08C GitHub trigger spec, including local Jenkins webhook
+  constraints, temporary tunnel and SCM polling options, branch safety, deploy
+  gates, verification expectations, and parent Unit 08 sequencing.
+- Added Jenkins branch detection and fail-fast guards so the Phase 0
+  image-publishing job only runs from the configured publish branch and shared
+  dev mutations only run from the approved deploy branch.
+- Documented the Unit 08C GitHub trigger workflow, including Multibranch and
+  single Pipeline setup, temporary tunnel webhook delivery, SCM polling
+  fallback, plugin requirements, branch safety, and troubleshooting.
 - Verified Terraform formatting and validation for the bootstrap and dev roots,
   plus smoke-test script shell syntax.
 
@@ -71,9 +84,13 @@ Open questions:
 - The combined 08A/08B Jenkins pipeline still needs a real run with dev ECR
   URLs and AWS credentials to validate image pushes, remote state, deploy,
   migration, ECS stability, and ALB smoke tests.
+- Unit 08C still needs a real GitHub `main` push or PR merge to verify webhook
+  delivery through a temporary tunnel, or SCM polling detection, against the
+  configured local Jenkins job.
 
-Next unit: run the combined Jenkins pipeline against AWS dev, then address any
-runtime deploy issues before moving to 09 Setup Logger.
+Next unit: configure the local Jenkins job and GitHub webhook or SCM polling,
+run the combined Jenkins pipeline against AWS dev, and address any runtime
+deploy issues before moving to 09 Setup Logger.
 
 ## Phase 1
 

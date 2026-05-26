@@ -4,6 +4,61 @@ def validateRequiredParam(String name) {
   }
 }
 
+def normalizeBranchName(String branchName) {
+  if (!branchName?.trim()) {
+    return ''
+  }
+
+  def normalized = branchName.trim()
+  normalized = normalized.replaceFirst(/^refs\/heads\//, '')
+  normalized = normalized.replaceFirst(/^remotes\/origin\//, '')
+  normalized = normalized.replaceFirst(/^origin\//, '')
+  return normalized
+}
+
+def detectBuildBranch() {
+  def candidates = [
+    env.BRANCH_NAME,
+    env.GIT_LOCAL_BRANCH,
+    env.GIT_BRANCH,
+  ]
+
+  for (candidate in candidates) {
+    def branchName = normalizeBranchName(candidate)
+    if (branchName && branchName != 'HEAD') {
+      return branchName
+    }
+  }
+
+  def gitBranch = sh(
+    label: 'Detect checked out branch',
+    returnStdout: true,
+    script: 'git rev-parse --abbrev-ref HEAD || true'
+  ).trim()
+  def checkedOutBranch = normalizeBranchName(gitBranch)
+  if (checkedOutBranch && checkedOutBranch != 'HEAD') {
+    return checkedOutBranch
+  }
+
+  return ''
+}
+
+def requireBranch(String branchName, String purpose) {
+  def expectedBranch = normalizeBranchName(branchName)
+  if (!expectedBranch) {
+    error("Expected branch is required for ${purpose}.")
+  }
+  if (!env.DETECTED_BRANCH?.trim()) {
+    error("Could not determine the SCM branch for ${purpose}.")
+  }
+  if (env.CHANGE_ID?.trim()) {
+    error("${purpose} is disabled for change request builds.")
+  }
+  if (env.DETECTED_BRANCH != expectedBranch) {
+    error("${purpose} is limited to ${expectedBranch}; detected ${env.DETECTED_BRANCH}.")
+  }
+}
+
 def loginToEcr(String registry, String region) {
   sh(
     label: "Authenticate Docker to ${registry}",
@@ -98,6 +153,11 @@ pipeline {
       description: 'Environment or channel prefix used for published image tags.'
     )
     string(
+      name: 'PUBLISH_BRANCH',
+      defaultValue: 'main',
+      description: 'Branch allowed to run the Phase 0 dev image-publishing job.'
+    )
+    string(
       name: 'AWS_CREDENTIALS_ID',
       defaultValue: '',
       description: 'Optional Jenkins AWS credentials ID. Leave blank when the agent already has an AWS role.'
@@ -184,7 +244,10 @@ pipeline {
           env.IMAGE_LATEST_TAG = "${params.IMAGE_TAG_PREFIX}-latest"
           env.STOREFRONT_CANDIDATE_IMAGE_URI = "${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}"
           env.API_CANDIDATE_IMAGE_URI = "${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}"
+          env.DETECTED_BRANCH = detectBuildBranch()
 
+          echo "SCM branch: ${env.DETECTED_BRANCH ?: 'unknown'}"
+          echo "Change request: ${env.CHANGE_ID ?: 'none'}"
           echo "Publishing image tags: ${env.IMAGE_SHA_TAG}, ${env.IMAGE_BUILD_TAG}, ${env.IMAGE_COMBINED_TAG}"
           if (params.PUSH_DEV_LATEST) {
             echo "Moving tag enabled: ${env.IMAGE_LATEST_TAG}"
@@ -200,10 +263,14 @@ pipeline {
           validateRequiredParam('STOREFRONT_ECR_REPOSITORY_URL')
           validateRequiredParam('COMMERCE_API_ECR_REPOSITORY_URL')
           validateRequiredParam('IMAGE_TAG_PREFIX')
+          validateRequiredParam('PUBLISH_BRANCH')
+          validateRequiredParam('APPROVED_DEV_DEPLOY_BRANCH')
 
           if (!(params.IMAGE_TAG_PREFIX ==~ /[a-z0-9][a-z0-9._-]*/)) {
             error('IMAGE_TAG_PREFIX must be a valid lowercase Docker tag prefix.')
           }
+
+          requireBranch(params.PUBLISH_BRANCH, 'Phase 0 dev image publishing')
 
           if (params.PLAN_DEV || params.DEPLOY_DEV || params.BOOTSTRAP_REMOTE_STATE) {
             validateRequiredParam('TF_BACKEND_BUCKET')
@@ -217,13 +284,8 @@ pipeline {
             error('API_DESIRED_COUNT must be a non-negative integer.')
           }
 
-          if (
-            params.DEPLOY_DEV &&
-            params.AUTO_APPROVE_DEV_DEPLOY &&
-            env.BRANCH_NAME?.trim() &&
-            env.BRANCH_NAME != params.APPROVED_DEV_DEPLOY_BRANCH
-          ) {
-            error("AUTO_APPROVE_DEV_DEPLOY is limited to ${params.APPROVED_DEV_DEPLOY_BRANCH}.")
+          if (params.DEPLOY_DEV || params.BOOTSTRAP_REMOTE_STATE || params.MIGRATE_LOCAL_STATE) {
+            requireBranch(params.APPROVED_DEV_DEPLOY_BRANCH, 'Shared dev environment mutation')
           }
         }
       }

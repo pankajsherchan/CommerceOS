@@ -20,6 +20,12 @@ Unit 08 is split into smaller implementation specs:
    - run API database migrations against dev RDS through an AWS-side one-off
      ECS task
    - smoke test the dev ALB
+3. `08c-trigger-jenkins-pipeline-github.md`
+   - trigger the local Jenkins pipeline automatically when GitHub `main` is
+     updated by a PR merge or direct push
+   - document the local-controller webhook constraint and supported tunnel or
+     polling options
+   - keep deploy behavior gated behind the existing Unit 08B parameters
 
 Keycloak dev auth verification is optional in Unit 08B. The pipeline can use a
 reachable dev Keycloak issuer when one is provided, but this split does not add
@@ -50,6 +56,16 @@ This step makes deployment repeatable:
 - Alembic migrations run as an explicit deploy step
 - smoke tests verify the deployed dev environment
 
+### 08C Third: GitHub Trigger
+
+This step makes the local Jenkins pipeline respond to source-control changes:
+
+- a GitHub `push` event for `refs/heads/main` starts the Jenkins `main` job
+- PR merges and direct pushes to `main` both trigger image publishing
+- local Jenkins webhook delivery uses a temporary public tunnel, or Jenkins SCM
+  polling acts as the fallback
+- dev deployment remains opt-in through the Unit 08B plan/deploy gates
+
 ## Out of Scope For All Unit 08 Work
 
 - Production deployment jobs.
@@ -57,7 +73,8 @@ This step makes deployment repeatable:
 - Autoscaling.
 - HTTPS, custom domains, or certificate management.
 - Provisioning the Jenkins controller itself in AWS.
-- Exposing the local Jenkins controller publicly for inbound webhooks.
+- Permanent public exposure of the local Jenkins controller. Unit 08C may use a
+  temporary development tunnel for GitHub webhook delivery.
 - Full Jenkins Configuration as Code for controller users, plugins, and
   hardening.
 - Full browser end-to-end test automation.
@@ -65,7 +82,8 @@ This step makes deployment repeatable:
 
 ## Parent Verification
 
-Unit 08 is complete only when both child specs are implemented and verified:
+Unit 08 is complete only when all child specs are implemented and verified:
 
 - [ ] `08a-jenkins-ci-image-publishing.md`
 - [ ] `08b-remote-state-dev-deploy.md`
+- [ ] `08c-trigger-jenkins-pipeline-github.md`
