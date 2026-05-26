@@ -27,6 +27,45 @@ def pushImageTags(String repositoryUrl) {
   )
 }
 
+def withAwsCredentials(Closure body) {
+  if (params.AWS_CREDENTIALS_ID?.trim()) {
+    withCredentials([[
+      $class: 'AmazonWebServicesCredentialsBinding',
+      credentialsId: params.AWS_CREDENTIALS_ID
+    ]]) {
+      body()
+    }
+  } else {
+    body()
+  }
+}
+
+def withDevTerraformCredentials(Closure body) {
+  def runWithDbPassword = {
+    if (params.DEV_DB_PASSWORD_CREDENTIALS_ID?.trim()) {
+      withCredentials([string(
+        credentialsId: params.DEV_DB_PASSWORD_CREDENTIALS_ID,
+        variable: 'TF_VAR_db_password'
+      )]) {
+        body()
+      }
+    } else {
+      body()
+    }
+  }
+
+  if (params.AWS_CREDENTIALS_ID?.trim()) {
+    withCredentials([[
+      $class: 'AmazonWebServicesCredentialsBinding',
+      credentialsId: params.AWS_CREDENTIALS_ID
+    ]]) {
+      runWithDbPassword()
+    }
+  } else {
+    runWithDbPassword()
+  }
+}
+
 pipeline {
   agent any
 
@@ -68,6 +107,61 @@ pipeline {
       defaultValue: true,
       description: 'Also publish a moving dev-latest tag for each image.'
     )
+    booleanParam(
+      name: 'PLAN_DEV',
+      defaultValue: false,
+      description: 'Run the remote-state Terraform dev deployment plans after image publishing.'
+    )
+    booleanParam(
+      name: 'DEPLOY_DEV',
+      defaultValue: false,
+      description: 'Apply the dev deployment after image publishing, migration, and approval.'
+    )
+    booleanParam(
+      name: 'AUTO_APPROVE_DEV_DEPLOY',
+      defaultValue: false,
+      description: 'Skip the manual approval input when DEPLOY_DEV is enabled on the approved branch.'
+    )
+    booleanParam(
+      name: 'BOOTSTRAP_REMOTE_STATE',
+      defaultValue: false,
+      description: 'Create or update the dev S3 Terraform backend bucket before planning.'
+    )
+    booleanParam(
+      name: 'MIGRATE_LOCAL_STATE',
+      defaultValue: false,
+      description: 'Run terraform init with -migrate-state -force-copy for dev remote state migration.'
+    )
+    string(
+      name: 'TF_BACKEND_BUCKET',
+      defaultValue: '',
+      description: 'S3 bucket name for dev Terraform state.'
+    )
+    string(
+      name: 'TF_BACKEND_KEY',
+      defaultValue: 'commerce-os/dev/terraform.tfstate',
+      description: 'S3 object key for dev Terraform state.'
+    )
+    string(
+      name: 'DEV_DB_PASSWORD_CREDENTIALS_ID',
+      defaultValue: '',
+      description: 'Optional Jenkins Secret Text credential ID bound to TF_VAR_db_password.'
+    )
+    string(
+      name: 'STOREFRONT_DESIRED_COUNT',
+      defaultValue: '1',
+      description: 'Storefront ECS desired count for dev rollout.'
+    )
+    string(
+      name: 'API_DESIRED_COUNT',
+      defaultValue: '1',
+      description: 'Commerce API ECS desired count for dev rollout.'
+    )
+    string(
+      name: 'APPROVED_DEV_DEPLOY_BRANCH',
+      defaultValue: 'main',
+      description: 'Branch allowed to skip manual approval for dev deploys.'
+    )
   }
 
   environment {
@@ -88,6 +182,8 @@ pipeline {
           env.IMAGE_BUILD_TAG = "${params.IMAGE_TAG_PREFIX}-build-${env.BUILD_NUMBER}"
           env.IMAGE_COMBINED_TAG = "${params.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}-b${env.BUILD_NUMBER}"
           env.IMAGE_LATEST_TAG = "${params.IMAGE_TAG_PREFIX}-latest"
+          env.STOREFRONT_CANDIDATE_IMAGE_URI = "${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}"
+          env.API_CANDIDATE_IMAGE_URI = "${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}"
 
           echo "Publishing image tags: ${env.IMAGE_SHA_TAG}, ${env.IMAGE_BUILD_TAG}, ${env.IMAGE_COMBINED_TAG}"
           if (params.PUSH_DEV_LATEST) {
@@ -107,6 +203,27 @@ pipeline {
 
           if (!(params.IMAGE_TAG_PREFIX ==~ /[a-z0-9][a-z0-9._-]*/)) {
             error('IMAGE_TAG_PREFIX must be a valid lowercase Docker tag prefix.')
+          }
+
+          if (params.PLAN_DEV || params.DEPLOY_DEV || params.BOOTSTRAP_REMOTE_STATE) {
+            validateRequiredParam('TF_BACKEND_BUCKET')
+            validateRequiredParam('TF_BACKEND_KEY')
+          }
+
+          if (!(params.STOREFRONT_DESIRED_COUNT ==~ /[0-9]+/)) {
+            error('STOREFRONT_DESIRED_COUNT must be a non-negative integer.')
+          }
+          if (!(params.API_DESIRED_COUNT ==~ /[0-9]+/)) {
+            error('API_DESIRED_COUNT must be a non-negative integer.')
+          }
+
+          if (
+            params.DEPLOY_DEV &&
+            params.AUTO_APPROVE_DEV_DEPLOY &&
+            env.BRANCH_NAME?.trim() &&
+            env.BRANCH_NAME != params.APPROVED_DEV_DEPLOY_BRANCH
+          ) {
+            error("AUTO_APPROVE_DEV_DEPLOY is limited to ${params.APPROVED_DEV_DEPLOY_BRANCH}.")
           }
         }
       }
@@ -201,15 +318,252 @@ pipeline {
             pushImageTags(params.COMMERCE_API_ECR_REPOSITORY_URL)
           }
 
-          if (params.AWS_CREDENTIALS_ID?.trim()) {
-            withCredentials([[
-              $class: 'AmazonWebServicesCredentialsBinding',
-              credentialsId: params.AWS_CREDENTIALS_ID
-            ]]) {
-              publishImages()
-            }
-          } else {
+          withAwsCredentials {
             publishImages()
+          }
+        }
+      }
+    }
+
+    stage('Remote State Bootstrap') {
+      when {
+        expression { params.BOOTSTRAP_REMOTE_STATE }
+      }
+      steps {
+        script {
+          withAwsCredentials {
+            dir('infra/terraform/bootstrap/dev-state') {
+              sh 'terraform init -backend=false'
+              sh(
+                label: 'Apply dev remote-state bootstrap',
+                script: """
+                  terraform apply -auto-approve -input=false \\
+                    -var 'aws_region=${params.AWS_REGION}' \\
+                    -var 'bucket_name=${params.TF_BACKEND_BUCKET}'
+                """.stripIndent()
+              )
+            }
+          }
+        }
+      }
+    }
+
+    stage('Terraform Init Remote State') {
+      when {
+        expression { params.PLAN_DEV || params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withDevTerraformCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh(
+                label: 'Initialize dev remote state',
+                script: """
+                  terraform init -input=false \\
+                    -backend-config='bucket=${params.TF_BACKEND_BUCKET}' \\
+                    -backend-config='key=${params.TF_BACKEND_KEY}' \\
+                    -backend-config='region=${params.AWS_REGION}' \\
+                    ${params.MIGRATE_LOCAL_STATE ? '-migrate-state -force-copy' : ''}
+                """.stripIndent()
+              )
+            }
+          }
+        }
+      }
+    }
+
+    stage('Terraform Plan Dev') {
+      when {
+        expression { params.PLAN_DEV || params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withDevTerraformCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh(
+                label: 'Plan migration task definition',
+                script: """
+                  terraform plan -input=false -out=dev-migration-task.tfplan \\
+                    -target=aws_ecs_cluster.main \\
+                    -target=aws_ecs_task_definition.api_migration \\
+                    -var 'aws_region=${params.AWS_REGION}' \\
+                    -var 'storefront_image_uri=${env.STOREFRONT_CANDIDATE_IMAGE_URI}' \\
+                    -var 'api_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
+                    -var 'api_migration_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
+                    -var 'storefront_desired_count=${params.STOREFRONT_DESIRED_COUNT}' \\
+                    -var 'api_desired_count=${params.API_DESIRED_COUNT}'
+                  terraform show -no-color dev-migration-task.tfplan > dev-migration-task.txt
+                """.stripIndent()
+              )
+              sh(
+                label: 'Preview full dev rollout',
+                script: """
+                  terraform plan -input=false -out=dev-rollout-preview.tfplan \\
+                    -var 'aws_region=${params.AWS_REGION}' \\
+                    -var 'storefront_image_uri=${env.STOREFRONT_CANDIDATE_IMAGE_URI}' \\
+                    -var 'api_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
+                    -var 'api_migration_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
+                    -var 'storefront_desired_count=${params.STOREFRONT_DESIRED_COUNT}' \\
+                    -var 'api_desired_count=${params.API_DESIRED_COUNT}'
+                  terraform show -no-color dev-rollout-preview.tfplan > dev-rollout-preview.txt
+                """.stripIndent()
+              )
+            }
+          }
+          archiveArtifacts artifacts: 'infra/terraform/envs/dev/dev-*.txt', allowEmptyArchive: true
+        }
+      }
+    }
+
+    stage('Dev Deploy Approval') {
+      when {
+        expression { params.DEPLOY_DEV && !params.AUTO_APPROVE_DEV_DEPLOY }
+      }
+      steps {
+        input message: "Deploy ${env.IMAGE_COMBINED_TAG} to AWS dev?", ok: 'Deploy'
+      }
+    }
+
+    stage('Apply Migration Task Definition') {
+      when {
+        expression { params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withDevTerraformCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh 'terraform apply -input=false dev-migration-task.tfplan'
+            }
+          }
+        }
+      }
+    }
+
+    stage('Run Database Migration') {
+      when {
+        expression { params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withAwsCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh(
+                label: 'Run Alembic migration task',
+                script: '''
+                  set -eu
+
+                  CLUSTER_NAME="$(terraform output -raw ecs_cluster_name)"
+                  TASK_DEFINITION="$(terraform output -raw api_migration_task_definition_arn)"
+                  CONTAINER_NAME="$(terraform output -raw api_migration_container_name)"
+                  SUBNET_IDS="$(terraform output -json public_subnet_ids | jq -r 'join(",")')"
+                  SECURITY_GROUP_ID="$(terraform output -raw ecs_task_security_group_id)"
+
+                  aws ecs run-task \
+                    --cluster "$CLUSTER_NAME" \
+                    --launch-type FARGATE \
+                    --task-definition "$TASK_DEFINITION" \
+                    --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SECURITY_GROUP_ID],assignPublicIp=ENABLED}" \
+                    > migration-run-task.json
+
+                  if [ "$(jq -r '.failures | length' migration-run-task.json)" != "0" ]; then
+                    cat migration-run-task.json
+                    exit 1
+                  fi
+
+                  TASK_ARN="$(jq -r '.tasks[0].taskArn' migration-run-task.json)"
+                  if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" = "null" ]; then
+                    cat migration-run-task.json
+                    exit 1
+                  fi
+
+                  aws ecs wait tasks-stopped --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN"
+                  aws ecs describe-tasks --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN" > migration-describe-task.json
+
+                  EXIT_CODE="$(jq -r --arg name "$CONTAINER_NAME" '.tasks[0].containers[] | select(.name == $name) | .exitCode // empty' migration-describe-task.json)"
+                  if [ "$EXIT_CODE" != "0" ]; then
+                    cat migration-describe-task.json
+                    exit 1
+                  fi
+                '''.stripIndent()
+              )
+            }
+          }
+          archiveArtifacts artifacts: 'infra/terraform/envs/dev/migration-*.json', allowEmptyArchive: true
+        }
+      }
+    }
+
+    stage('Apply ECS Rollout') {
+      when {
+        expression { params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withDevTerraformCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh(
+                label: 'Apply dev ECS rollout',
+                script: """
+                  terraform plan -input=false -out=dev-rollout.tfplan \\
+                    -var 'aws_region=${params.AWS_REGION}' \\
+                    -var 'storefront_image_uri=${env.STOREFRONT_CANDIDATE_IMAGE_URI}' \\
+                    -var 'api_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
+                    -var 'api_migration_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
+                    -var 'storefront_desired_count=${params.STOREFRONT_DESIRED_COUNT}' \\
+                    -var 'api_desired_count=${params.API_DESIRED_COUNT}'
+                  terraform apply -input=false dev-rollout.tfplan
+                """.stripIndent()
+              )
+            }
+          }
+        }
+      }
+    }
+
+    stage('ECS Stability') {
+      when {
+        expression { params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withAwsCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh(
+                label: 'Wait for dev ECS services',
+                script: '''
+                  set -eu
+
+                  CLUSTER_NAME="$(terraform output -raw ecs_cluster_name)"
+                  STOREFRONT_SERVICE="$(terraform output -raw storefront_service_name)"
+                  API_SERVICE="$(terraform output -raw api_service_name)"
+
+                  aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$STOREFRONT_SERVICE"
+                  aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$API_SERVICE"
+                '''.stripIndent()
+              )
+            }
+          }
+        }
+      }
+    }
+
+    stage('Smoke Test Dev') {
+      when {
+        expression { params.DEPLOY_DEV }
+      }
+      steps {
+        script {
+          withAwsCredentials {
+            dir('infra/terraform/envs/dev') {
+              sh(
+                label: 'Run ALB smoke tests',
+                script: '''
+                  set -eu
+                  ALB_DNS_NAME="$(terraform output -raw alb_dns_name)"
+                  bash ../../../../platform/jenkins/scripts/smoke-dev-alb.sh "http://$ALB_DNS_NAME"
+                '''.stripIndent()
+              )
+            }
           }
         }
       }

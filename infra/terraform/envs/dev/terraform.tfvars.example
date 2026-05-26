@@ -7,3 +7,21 @@ db_password = "replace-with-a-long-random-dev-password"
 # Defaults point at the Terraform-created ECR repositories with the latest tag.
 # storefront_image_uri = "account-id.dkr.ecr.us-west-2.amazonaws.com/commerce-os-dev-storefront:latest"
 # api_image_uri        = "account-id.dkr.ecr.us-west-2.amazonaws.com/commerce-os-dev-commerce-api:latest"
+
+# The migration task can use a candidate API image before the long-running API
+# service rolls to that image.
+# api_migration_image_uri = "account-id.dkr.ecr.us-west-2.amazonaws.com/commerce-os-dev-commerce-api:dev-sha-b1"
+
+# Optional storefront auth values for an externally reachable dev Keycloak.
+# storefront_environment_variables = {
+#   KEYCLOAK_ISSUER_URL              = "https://keycloak.example.com/realms/commerceos"
+#   KEYCLOAK_CLIENT_ID               = "commerceos-storefront"
+#   STOREFRONT_AUTH_REDIRECT_URI     = "http://dev-alb.example.com/auth/callback"
+# }
+#
+# Store auth secrets in Secrets Manager and reference their ARNs instead of
+# placing secret values in tfvars.
+# storefront_secrets = {
+#   KEYCLOAK_CLIENT_SECRET           = "arn:aws:secretsmanager:us-west-2:123456789012:secret:commerce-os/dev/keycloak-client-secret"
+#   STOREFRONT_AUTH_SESSION_SECRET   = "arn:aws:secretsmanager:us-west-2:123456789012:secret:commerce-os/dev/storefront-session-secret"
+# }

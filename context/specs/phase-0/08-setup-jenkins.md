@@ -14,9 +14,11 @@ Unit 08 is split into smaller implementation specs:
    - do not deploy ECS or mutate Terraform infrastructure
 2. `08b-remote-state-dev-deploy.md`
    - add remote Terraform state for the dev environment
-   - let Jenkins run controlled Terraform plan/apply
+   - let the locally running Jenkins controller run controlled Terraform
+     plan/apply against AWS dev
    - deploy the pushed images to ECS
-   - run API database migrations against dev RDS
+   - run API database migrations against dev RDS through an AWS-side one-off
+     ECS task
    - smoke test the dev ALB
 
 Keycloak dev auth verification is optional in Unit 08B. The pipeline can use a
@@ -42,7 +44,8 @@ This step makes deployment repeatable:
 
 - Terraform dev state moves from local-only state to an S3 backend with native
   S3 lock files
-- Jenkins can safely run Terraform against shared state
+- local Jenkins can safely run Terraform against shared state and manage the
+  AWS dev deploy path
 - ECS services move from `desired_count = 0` to real running dev tasks
 - Alembic migrations run as an explicit deploy step
 - smoke tests verify the deployed dev environment
@@ -54,6 +57,7 @@ This step makes deployment repeatable:
 - Autoscaling.
 - HTTPS, custom domains, or certificate management.
 - Provisioning the Jenkins controller itself in AWS.
+- Exposing the local Jenkins controller publicly for inbound webhooks.
 - Full Jenkins Configuration as Code for controller users, plugins, and
   hardening.
 - Full browser end-to-end test automation.

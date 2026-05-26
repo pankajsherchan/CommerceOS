@@ -1,12 +1,6 @@
 terraform {
   required_version = ">= 1.6.0"
 
-  backend "s3" {
-    key          = "commerce-os/dev/terraform.tfstate"
-    encrypt      = true
-    use_lockfile = true
-  }
-
   required_providers {
     aws = {
       source  = "hashicorp/aws"

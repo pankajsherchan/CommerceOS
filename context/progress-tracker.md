@@ -14,10 +14,11 @@
   - [ ] 08B Remote Terraform State and Dev Deploy
 - [ ] 09 Setup Logger
 
-Current unit: 08A Jenkins CI and Image Publishing
+Current unit: 08B Remote Terraform State and Dev Deploy
 
-Status: 08A implemented and locally verified; Jenkins/ECR execution pending.
-08B not started.
+Status: 08B implemented and locally verified where possible; real Jenkins/AWS
+execution is still pending for image push, remote-state bootstrap, Terraform
+apply, ECS migration, ECS rollout, and ALB smoke tests.
 
 Completed scope:
 
@@ -43,18 +44,36 @@ Completed scope:
 - Verified storefront lint, typecheck, tests, and build; commerce API tests and
   import smoke; Terraform fmt/init/validate; and local storefront/API Docker
   image builds.
+- Revised the Unit 08B spec so the locally running Jenkins controller manages
+  remote-state bootstrap, controlled Terraform deploys, AWS-side migration
+  tasks, ECS stability checks, and dev ALB smoke tests.
+- Added a dev remote-state bootstrap Terraform root for an encrypted,
+  versioned S3 bucket with public access blocked.
+- Moved the dev Terraform environment to partial S3 backend configuration with
+  native S3 lock files enabled.
+- Added dev Terraform support and outputs for an API Alembic migration ECS
+  task, ECS service names, task networking, database secret ARN, and task
+  definition ARNs.
+- Fixed dev ALB API routing defaults to include `/api/*` and `/health`.
+- Extended the Jenkins pipeline with optional remote-state bootstrap, remote
+  init/state migration, Terraform plans, gated dev apply, AWS-side migration
+  task execution, ECS stability waits, and ALB smoke tests.
+- Documented local Jenkins deploy assumptions, backend bootstrap/state
+  migration, deploy parameters, rollback notes, and optional Keycloak
+  configuration.
+- Verified Terraform formatting and validation for the bootstrap and dev roots,
+  plus smoke-test script shell syntax.
 
 Open questions:
 
-- For 08B, should backend bootstrap run only manually, or should Jenkins expose
-  it as a protected one-time action?
 - What reachable Keycloak issuer should the AWS dev storefront use for
   sign-in/sign-out verification when auth smoke tests are enabled?
-- 08A still needs a real Jenkins run with Unit 07 ECR repository URLs to
-  validate Jenkinsfile execution and image pushes.
+- The combined 08A/08B Jenkins pipeline still needs a real run with dev ECR
+  URLs and AWS credentials to validate image pushes, remote state, deploy,
+  migration, ECS stability, and ALB smoke tests.
 
-Next unit: run the 08A Jenkins job against dev ECR, then implement 08B Remote
-Terraform State and Dev Deploy.
+Next unit: run the combined Jenkins pipeline against AWS dev, then address any
+runtime deploy issues before moving to 09 Setup Logger.
 
 ## Phase 1
 

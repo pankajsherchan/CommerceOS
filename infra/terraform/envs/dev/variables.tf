@@ -76,8 +76,20 @@ variable "api_image_uri" {
   default     = null
 }
 
+variable "api_migration_image_uri" {
+  description = "Commerce API container image URI used by the one-off Alembic migration task. Defaults to api_image_uri."
+  type        = string
+  default     = null
+}
+
 variable "storefront_environment_variables" {
   description = "Additional plain environment variables for the storefront container."
+  type        = map(string)
+  default     = {}
+}
+
+variable "storefront_secrets" {
+  description = "Storefront ECS secrets mapping from environment variable name to Secrets Manager ARN."
   type        = map(string)
   default     = {}
 }
@@ -91,5 +103,5 @@ variable "api_environment_variables" {
 variable "api_listener_paths" {
   description = "ALB path patterns routed to the commerce API."
   type        = list(string)
-  default     = ["/health", "/catalog*", "/cart*"]
+  default     = ["/api/*", "/health"]
 }
