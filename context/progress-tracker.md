@@ -8,26 +8,38 @@
 - [x] 04 Setup Auth
 - [x] 05 Setup API Endpoints
 - [x] 06 Setup DB
-- [ ] 07 Setup TF
+- [x] 07 Setup TF
 - [ ] 08 Setup Jenkins
+  - [ ] 08A Jenkins CI and Image Publishing
+  - [ ] 08B Remote Terraform State and Dev Deploy
 - [ ] 09 Setup Logger
 
-Current unit: 06 Setup DB
+Current unit: 08A Jenkins CI and Image Publishing
 
-Status: implemented and verified.
+Status: spec completed; implementation not started.
 
 Completed scope:
 
-- Added Docker Compose PostgreSQL for local development.
-- Added SQLAlchemy 2.0 models, request-scoped DB sessions, and Alembic
-  migrations for catalog and placeholder cart tables.
-- Seeded the Phase 0 starter categories, products, and cart lines through the
-  initial migration.
-- Replaced in-memory catalog and cart repositories with DB-backed repositories
-  while preserving the Unit 05 API contract.
-- Updated backend tests to use isolated seeded database sessions.
+- Detailed the Unit 07 Terraform spec.
+- Added Terraform modules for network, RDS PostgreSQL, and reusable ECS
+  Fargate service wiring.
+- Added a dev environment composition for ECR, ECS, ALB, RDS, CloudWatch logs,
+  IAM roles, and the API database secret.
+- Updated Terraform docs and ignore rules for local state/tfvars handling.
+- Added a beginner-friendly HTML walkthrough for the Unit 07 Terraform changes.
+- Detailed the Unit 08 Jenkins pipeline spec, including Docker image build,
+  ECR push, Terraform deploy, migration, ECS update, and smoke-test scope.
+- Split Unit 08 into 08A for Jenkins CI/image publishing and 08B for remote
+  Terraform state plus dev deploy.
 
-Next unit: 07 Setup TF.
+Open questions:
+
+- For 08B, should backend bootstrap run only manually, or should Jenkins expose
+  it as a protected one-time action?
+- What reachable Keycloak issuer should the AWS dev storefront use for
+  sign-in/sign-out verification when auth smoke tests are enabled?
+
+Next unit: implement 08A Jenkins CI and Image Publishing.
 
 ## Phase 1
 

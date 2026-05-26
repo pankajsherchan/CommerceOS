@@ -1,0 +1,9 @@
+db_password = "replace-with-a-long-random-dev-password"
+
+# Leave desired counts at zero until container images exist in ECR.
+# storefront_desired_count = 1
+# api_desired_count        = 1
+
+# Defaults point at the Terraform-created ECR repositories with the latest tag.
+# storefront_image_uri = "account-id.dkr.ecr.us-west-2.amazonaws.com/commerce-os-dev-storefront:latest"
+# api_image_uri        = "account-id.dkr.ecr.us-west-2.amazonaws.com/commerce-os-dev-commerce-api:latest"

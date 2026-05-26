@@ -10,3 +10,8 @@ test-results
 .venv
 .pytest_cache
 __pycache__
+.terraform
+terraform.tfstate
+terraform.tfstate.*
+*.tfvars
+!*.tfvars.example

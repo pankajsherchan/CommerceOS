@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CommerceOS Terraform Unit 07 Guide</title>
+    <style>
+      :root {
+        --bg: #f6f2eb;
+        --surface: #fffaf4;
+        --elevated: #ffffff;
+        --text: #1d2430;
+        --muted: #5f6674;
+        --accent: #b85c2d;
+        --accent-soft: #f2d7c7;
+        --border: #d7cbbd;
+        --code-bg: #111925;
+        --code-text: #e6edf3;
+        --ok: #157347;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .wrap {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 48px 0 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+      }
+
+      h1 {
+        max-width: 780px;
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4rem);
+      }
+
+      .subtitle {
+        max-width: 760px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1.1rem;
+      }
+
+      main {
+        padding: 28px 0 56px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      nav {
+        position: sticky;
+        top: 16px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      nav h2 {
+        margin: 0 0 10px;
+        font-size: 0.95rem;
+      }
+
+      nav a {
+        display: block;
+        padding: 7px 0;
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      nav a:hover,
+      nav a:focus {
+        color: var(--accent);
+      }
+
+      section {
+        margin-bottom: 28px;
+        padding: 24px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      section h2 {
+        margin: 0 0 14px;
+        font-size: 1.6rem;
+      }
+
+      section h3 {
+        margin: 22px 0 8px;
+        font-size: 1.1rem;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      ul,
+      ol {
+        margin: 0 0 14px 1.2rem;
+        padding: 0;
+      }
+
+      li {
+        margin: 7px 0;
+      }
+
+      code {
+        border-radius: 5px;
+        background: var(--accent-soft);
+        padding: 0.1rem 0.32rem;
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 14px 0;
+        padding: 16px;
+        border-radius: 8px;
+        background: var(--code-bg);
+        color: var(--code-text);
+      }
+
+      pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+
+      .callout {
+        margin: 16px 0;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        border-radius: 6px;
+        background: var(--elevated);
+      }
+
+      .success {
+        border-left-color: var(--ok);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .tile {
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elevated);
+      }
+
+      .tile h3 {
+        margin-top: 0;
+      }
+
+      .flow {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elevated);
+      }
+
+      .number {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff8f2;
+        font-weight: 800;
+      }
+
+      .step h3 {
+        margin: 2px 0 5px;
+      }
+
+      .step p {
+        margin-bottom: 0;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        nav {
+          position: static;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap hero">
+        <p class="eyebrow">CommerceOS Unit 07</p>
+        <h1>Terraform changes, explained step by step</h1>
+        <p class="subtitle">
+          This guide explains the new Terraform files like you are seeing
+          infrastructure-as-code for the first time. It follows the exact
+          CommerceOS dev environment added in Unit 07.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap layout">
+      <nav aria-label="Guide sections">
+        <h2>Sections</h2>
+        <a href="#big-picture">Big Picture</a>
+        <a href="#terraform-basics">Terraform Basics</a>
+        <a href="#folder-map">Folder Map</a>
+        <a href="#resource-flow">Resource Flow</a>
+        <a href="#modules">Modules</a>
+        <a href="#dev-env">Dev Environment</a>
+        <a href="#commands">Commands</a>
+        <a href="#not-included">Not Included Yet</a>
+      </nav>
+
+      <div>
+        <section id="big-picture">
+          <h2>1. Big Picture</h2>
+          <p>
+            The Terraform work added a minimal AWS development environment for
+            CommerceOS. It does not deploy the app code yet. It creates the AWS
+            places where future app containers will run.
+          </p>
+          <div class="grid">
+            <div class="tile">
+              <h3>Storefront</h3>
+              <p>
+                The Next.js storefront gets an ECR repository and an ECS
+                service target. The ECS service currently runs zero tasks.
+              </p>
+            </div>
+            <div class="tile">
+              <h3>Commerce API</h3>
+              <p>
+                The FastAPI service gets its own ECR repository, ECS service,
+                load balancer route, and database connection secret.
+              </p>
+            </div>
+            <div class="tile">
+              <h3>Database</h3>
+              <p>
+                PostgreSQL is created with RDS in private subnets. Only ECS
+                tasks are allowed to connect to it.
+              </p>
+            </div>
+            <div class="tile">
+              <h3>Networking</h3>
+              <p>
+                A VPC, public subnets, private subnets, security groups, and an
+                internet gateway are created for the dev environment.
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Beginner translation:</strong> Terraform is creating the
+            cloud skeleton. Later work will build Docker images and tell ECS to
+            run them.
+          </div>
+        </section>
+
+        <section id="terraform-basics">
+          <h2>2. Terraform Basics</h2>
+          <p>
+            Terraform files describe the infrastructure you want. Terraform
+            compares those files to real AWS infrastructure and then makes a
+            plan to create, update, or delete resources.
+          </p>
+          <ul>
+            <li>
+              <code>resource</code> means "create or manage this real thing,"
+              such as a VPC, RDS instance, or ECS service.
+            </li>
+            <li>
+              <code>variable</code> means "a setting someone can change without
+              editing the main infrastructure code."
+            </li>
+            <li>
+              <code>output</code> means "print this useful value after
+              Terraform runs," such as an ALB DNS name.
+            </li>
+            <li>
+              <code>module</code> means "reuse a bundle of Terraform files."
+            </li>
+            <li>
+              <code>state</code> is Terraform's local record of what it manages.
+            </li>
+          </ul>
+        </section>
+
+        <section id="folder-map">
+          <h2>3. Folder Map</h2>
+          <p>
+            The new Terraform code lives under <code>infra/terraform</code>.
+            It is split into reusable modules and one actual dev environment.
+          </p>
+          <pre><code>infra/terraform/
+  README.md
+  modules/
+    network/
+    postgres/
+    ecs-service/
+  envs/
+    dev/
+      versions.tf
+      variables.tf
+      main.tf
+      outputs.tf
+      terraform.tfvars.example</code></pre>
+          <h3>Why split it this way?</h3>
+          <p>
+            Modules hold reusable building blocks. The dev environment chooses
+            which blocks to use and wires them together. Later, a prod
+            environment can reuse the same modules with different settings.
+          </p>
+        </section>
+
+        <section id="resource-flow">
+          <h2>4. Resource Flow</h2>
+          <p>
+            Terraform determines the real dependency graph automatically, but it
+            helps to read the code in this order.
+          </p>
+          <div class="flow">
+            <div class="step">
+              <div class="number">1</div>
+              <div>
+                <h3>Provider and inputs</h3>
+                <p>
+                  <code>versions.tf</code> selects the AWS provider.
+                  <code>variables.tf</code> defines settings like region,
+                  database password, image URI, and desired task counts.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">2</div>
+              <div>
+                <h3>Network</h3>
+                <p>
+                  The network module creates the VPC, public subnets, private
+                  subnets, route table, and internet gateway.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">3</div>
+              <div>
+                <h3>Container image homes</h3>
+                <p>
+                  ECR repositories are created for the storefront and API. They
+                  are empty until a later CI/CD step pushes images.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">4</div>
+              <div>
+                <h3>Load balancer and security groups</h3>
+                <p>
+                  The ALB accepts public HTTP traffic. Security groups allow the
+                  ALB to reach ECS tasks, and ECS tasks to reach RDS.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">5</div>
+              <div>
+                <h3>Database</h3>
+                <p>
+                  RDS PostgreSQL is created in private subnets. The database URL
+                  is built and stored in Secrets Manager for the API task.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">6</div>
+              <div>
+                <h3>ECS services</h3>
+                <p>
+                  ECS task definitions and services are created for storefront
+                  and API. They default to <code>desired_count = 0</code>, so no
+                  app containers run yet.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="modules">
+          <h2>5. The Three Modules</h2>
+          <h3><code>modules/network</code></h3>
+          <p>
+            Creates the basic AWS network. Public subnets are for the ALB and
+            dev ECS tasks. Private subnets are for RDS. There is no NAT gateway
+            yet, which keeps this unit simpler and cheaper.
+          </p>
+
+          <h3><code>modules/postgres</code></h3>
+          <p>
+            Creates the RDS PostgreSQL instance, the database subnet group, and
+            the security group that only accepts traffic from ECS tasks on port
+            <code>5432</code>.
+          </p>
+
+          <h3><code>modules/ecs-service</code></h3>
+          <p>
+            Creates an ECS task definition and service. It accepts the image,
+            port, environment variables, secrets, target group, and networking
+            inputs from the dev environment.
+          </p>
+        </section>
+
+        <section id="dev-env">
+          <h2>6. The Dev Environment</h2>
+          <p>
+            <code>envs/dev/main.tf</code> is the main composition file. It says
+            how the modules and AWS resources connect to each other.
+          </p>
+          <ul>
+            <li>
+              The storefront ALB target group listens on container port
+              <code>3000</code>.
+            </li>
+            <li>
+              The API ALB target group listens on container port
+              <code>8000</code>.
+            </li>
+            <li>
+              The ALB sends <code>/health</code>, <code>/catalog*</code>, and
+              <code>/cart*</code> to the API.
+            </li>
+            <li>
+              Everything else goes to the storefront target group by default.
+            </li>
+            <li>
+              The API receives <code>COMMERCE_API_DATABASE_URL</code> from AWS
+              Secrets Manager instead of a plain environment variable.
+            </li>
+          </ul>
+          <div class="callout success">
+            <strong>Important:</strong> both ECS services default to zero
+            running tasks. That is intentional because this unit did not add
+            Dockerfiles or build/push images.
+          </div>
+        </section>
+
+        <section id="commands">
+          <h2>7. Commands You Run</h2>
+          <h3>Format check</h3>
+          <p>Checks that Terraform files use standard formatting.</p>
+          <pre><code>cd infra/terraform
+terraform fmt -check -recursive</code></pre>
+
+          <h3>Initialize Terraform</h3>
+          <p>
+            Downloads the AWS provider and prepares the dev environment folder.
+          </p>
+          <pre><code>cd infra/terraform/envs/dev
+terraform init</code></pre>
+
+          <h3>Create local variables</h3>
+          <p>
+            The real <code>terraform.tfvars</code> file is ignored by Git so it
+            can contain local secrets like the database password.
+          </p>
+          <pre><code>cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars and set db_password</code></pre>
+
+          <h3>Validate</h3>
+          <p>Checks that Terraform understands the configuration.</p>
+          <pre><code>terraform validate</code></pre>
+
+          <h3>Plan</h3>
+          <p>
+            Shows what Terraform would create in AWS without actually creating
+            it.
+          </p>
+          <pre><code>terraform plan</code></pre>
+
+          <h3>Apply</h3>
+          <p>Creates the infrastructure in AWS. This can create AWS costs.</p>
+          <pre><code>terraform apply</code></pre>
+        </section>
+
+        <section id="not-included">
+          <h2>8. What Is Not Included Yet</h2>
+          <p>
+            This unit intentionally stops at a basic infrastructure baseline.
+            These items are for later units:
+          </p>
+          <ul>
+            <li>Dockerfiles for storefront or API</li>
+            <li>building and pushing container images</li>
+            <li>Jenkins deployment automation</li>
+            <li>HTTPS, custom domain, and certificates</li>
+            <li>production environment</li>
+            <li>autoscaling</li>
+            <li>remote Terraform state</li>
+            <li>database migrations as a deployment step</li>
+          </ul>
+          <p class="small">
+            Last updated for CommerceOS Unit 07: Setup TF.
+          </p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>
