@@ -1,0 +1,224 @@
+def validateRequiredParam(String name) {
+  if (!params[name]?.trim()) {
+    error("${name} is required")
+  }
+}
+
+def loginToEcr(String registry, String region) {
+  sh(
+    label: "Authenticate Docker to ${registry}",
+    script: """
+      aws ecr get-login-password --region '${region}' | docker login --username AWS --password-stdin '${registry}'
+    """.stripIndent()
+  )
+}
+
+def pushImageTags(String repositoryUrl) {
+  sh(
+    label: "Push ${repositoryUrl}",
+    script: """
+      docker push '${repositoryUrl}:${env.IMAGE_SHA_TAG}'
+      docker push '${repositoryUrl}:${env.IMAGE_BUILD_TAG}'
+      docker push '${repositoryUrl}:${env.IMAGE_COMBINED_TAG}'
+      if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
+        docker push '${repositoryUrl}:${env.IMAGE_LATEST_TAG}'
+      fi
+    """.stripIndent()
+  )
+}
+
+pipeline {
+  agent any
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+  }
+
+  parameters {
+    string(
+      name: 'AWS_REGION',
+      defaultValue: 'us-west-2',
+      description: 'AWS region containing the dev ECR repositories.'
+    )
+    string(
+      name: 'STOREFRONT_ECR_REPOSITORY_URL',
+      defaultValue: '',
+      description: 'Full ECR repository URL for the storefront image.'
+    )
+    string(
+      name: 'COMMERCE_API_ECR_REPOSITORY_URL',
+      defaultValue: '',
+      description: 'Full ECR repository URL for the commerce API image.'
+    )
+    string(
+      name: 'IMAGE_TAG_PREFIX',
+      defaultValue: 'dev',
+      description: 'Environment or channel prefix used for published image tags.'
+    )
+    string(
+      name: 'AWS_CREDENTIALS_ID',
+      defaultValue: '',
+      description: 'Optional Jenkins AWS credentials ID. Leave blank when the agent already has an AWS role.'
+    )
+    booleanParam(
+      name: 'PUSH_DEV_LATEST',
+      defaultValue: true,
+      description: 'Also publish a moving dev-latest tag for each image.'
+    )
+  }
+
+  environment {
+    DOCKER_BUILDKIT = '1'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+        script {
+          env.GIT_SHORT_SHA = sh(
+            label: 'Record short commit SHA',
+            returnStdout: true,
+            script: 'git rev-parse --short=12 HEAD'
+          ).trim()
+          env.IMAGE_SHA_TAG = "${params.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}"
+          env.IMAGE_BUILD_TAG = "${params.IMAGE_TAG_PREFIX}-build-${env.BUILD_NUMBER}"
+          env.IMAGE_COMBINED_TAG = "${params.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}-b${env.BUILD_NUMBER}"
+          env.IMAGE_LATEST_TAG = "${params.IMAGE_TAG_PREFIX}-latest"
+
+          echo "Publishing image tags: ${env.IMAGE_SHA_TAG}, ${env.IMAGE_BUILD_TAG}, ${env.IMAGE_COMBINED_TAG}"
+          if (params.PUSH_DEV_LATEST) {
+            echo "Moving tag enabled: ${env.IMAGE_LATEST_TAG}"
+          }
+        }
+      }
+    }
+
+    stage('Validate Inputs') {
+      steps {
+        script {
+          validateRequiredParam('AWS_REGION')
+          validateRequiredParam('STOREFRONT_ECR_REPOSITORY_URL')
+          validateRequiredParam('COMMERCE_API_ECR_REPOSITORY_URL')
+          validateRequiredParam('IMAGE_TAG_PREFIX')
+
+          if (!(params.IMAGE_TAG_PREFIX ==~ /[a-z0-9][a-z0-9._-]*/)) {
+            error('IMAGE_TAG_PREFIX must be a valid lowercase Docker tag prefix.')
+          }
+        }
+      }
+    }
+
+    stage('Storefront Verification') {
+      steps {
+        dir('apps/storefront') {
+          sh 'pnpm install --frozen-lockfile'
+          sh 'pnpm lint'
+          sh 'pnpm typecheck'
+          sh 'pnpm test'
+          sh 'pnpm build'
+        }
+      }
+    }
+
+    stage('Commerce API Verification') {
+      steps {
+        dir('services/commerce-api') {
+          sh 'uv sync --dev'
+          sh 'uv run pytest'
+          sh 'uv run python -c "from commerce_api.main import app; print(app.title)"'
+        }
+      }
+    }
+
+    stage('Terraform Static Verification') {
+      steps {
+        dir('infra/terraform') {
+          sh 'terraform fmt -check -recursive'
+        }
+        dir('infra/terraform/envs/dev') {
+          sh 'terraform init -backend=false'
+          sh 'terraform validate'
+        }
+      }
+    }
+
+    stage('Build Images') {
+      steps {
+        sh(
+          label: 'Build storefront image',
+          script: """
+            docker build \\
+              --file apps/storefront/Dockerfile \\
+              --tag '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}' \\
+              --tag '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}' \\
+              --tag '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+              apps/storefront
+
+            if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
+              docker tag \\
+                '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+                '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+            fi
+          """.stripIndent()
+        )
+        sh(
+          label: 'Build commerce API image',
+          script: """
+            docker build \\
+              --file services/commerce-api/Dockerfile \\
+              --tag '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}' \\
+              --tag '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}' \\
+              --tag '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+              services/commerce-api
+
+            if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
+              docker tag \\
+                '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+                '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+            fi
+          """.stripIndent()
+        )
+      }
+    }
+
+    stage('Push Images') {
+      steps {
+        script {
+          def registries = [
+            params.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0],
+            params.COMMERCE_API_ECR_REPOSITORY_URL.split('/')[0],
+          ].unique()
+
+          def publishImages = {
+            registries.each { registry ->
+              loginToEcr(registry, params.AWS_REGION)
+            }
+            pushImageTags(params.STOREFRONT_ECR_REPOSITORY_URL)
+            pushImageTags(params.COMMERCE_API_ECR_REPOSITORY_URL)
+          }
+
+          if (params.AWS_CREDENTIALS_ID?.trim()) {
+            withCredentials([[
+              $class: 'AmazonWebServicesCredentialsBinding',
+              credentialsId: params.AWS_CREDENTIALS_ID
+            ]]) {
+              publishImages()
+            }
+          } else {
+            publishImages()
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Published storefront and commerce API images with ${env.IMAGE_COMBINED_TAG}."
+    }
+  }
+}

@@ -16,7 +16,8 @@
 
 Current unit: 08A Jenkins CI and Image Publishing
 
-Status: spec completed; implementation not started.
+Status: 08A implemented and locally verified; Jenkins/ECR execution pending.
+08B not started.
 
 Completed scope:
 
@@ -31,6 +32,17 @@ Completed scope:
   ECR push, Terraform deploy, migration, ECS update, and smoke-test scope.
 - Split Unit 08 into 08A for Jenkins CI/image publishing and 08B for remote
   Terraform state plus dev deploy.
+- Added production Docker build definitions and `.dockerignore` files for the
+  storefront and commerce API.
+- Added the Unit 08A Jenkins pipeline for storefront/API/Terraform checks,
+  Docker image builds, and dev ECR image publishing.
+- Updated Jenkins docs with required tools, AWS access, parameters, and
+  published image tags.
+- Added beginner-friendly HTML walkthroughs for the Unit 08A Dockerfiles and
+  Jenkins pipeline.
+- Verified storefront lint, typecheck, tests, and build; commerce API tests and
+  import smoke; Terraform fmt/init/validate; and local storefront/API Docker
+  image builds.
 
 Open questions:
 
@@ -38,8 +50,11 @@ Open questions:
   it as a protected one-time action?
 - What reachable Keycloak issuer should the AWS dev storefront use for
   sign-in/sign-out verification when auth smoke tests are enabled?
+- 08A still needs a real Jenkins run with Unit 07 ECR repository URLs to
+  validate Jenkinsfile execution and image pushes.
 
-Next unit: implement 08A Jenkins CI and Image Publishing.
+Next unit: run the 08A Jenkins job against dev ECR, then implement 08B Remote
+Terraform State and Dev Deploy.
 
 ## Phase 1
 

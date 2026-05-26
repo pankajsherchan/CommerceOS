@@ -1,0 +1,742 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CommerceOS Unit 08A Dockerfile Guide</title>
+    <style>
+      :root {
+        --bg: #f6f2eb;
+        --surface: #fffaf4;
+        --elevated: #ffffff;
+        --text: #1d2430;
+        --muted: #5f6674;
+        --accent: #b85c2d;
+        --accent-soft: #f2d7c7;
+        --border: #d7cbbd;
+        --code-bg: #111925;
+        --code-text: #e6edf3;
+        --ok: #157347;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .wrap {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 48px 0 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4rem);
+      }
+
+      .subtitle {
+        max-width: 780px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1.1rem;
+      }
+
+      main {
+        padding: 28px 0 56px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      nav {
+        position: sticky;
+        top: 16px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      nav h2 {
+        margin: 0 0 10px;
+        font-size: 0.95rem;
+      }
+
+      nav a {
+        display: block;
+        padding: 7px 0;
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      nav a:hover,
+      nav a:focus {
+        color: var(--accent);
+      }
+
+      section {
+        margin-bottom: 28px;
+        padding: 24px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      section h2 {
+        margin: 0 0 14px;
+        font-size: 1.6rem;
+      }
+
+      section h3 {
+        margin: 22px 0 8px;
+        font-size: 1.1rem;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      ul,
+      ol {
+        margin: 0 0 14px 1.2rem;
+        padding: 0;
+      }
+
+      li {
+        margin: 7px 0;
+      }
+
+      code {
+        border-radius: 5px;
+        background: var(--accent-soft);
+        padding: 0.1rem 0.32rem;
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 14px 0;
+        padding: 16px;
+        border-radius: 8px;
+        background: var(--code-bg);
+        color: var(--code-text);
+      }
+
+      pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+
+      .callout {
+        margin: 16px 0;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        border-radius: 6px;
+        background: var(--elevated);
+      }
+
+      .success {
+        border-left-color: var(--ok);
+      }
+
+      .flow {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elevated);
+      }
+
+      .number {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff8f2;
+        font-weight: 800;
+      }
+
+      .step h3 {
+        margin: 2px 0 5px;
+      }
+
+      .step p {
+        margin-bottom: 0;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .tile {
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elevated);
+      }
+
+      .tile h3 {
+        margin-top: 0;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.94rem;
+      }
+
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        nav {
+          position: static;
+        }
+
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap hero">
+        <p class="eyebrow">CommerceOS Unit 08A</p>
+        <h1>Dockerfiles, explained step by step</h1>
+        <p class="subtitle">
+          This guide explains the storefront and commerce API Dockerfiles added
+          for CI image publishing. It follows the files exactly and explains why
+          each stage exists.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap layout">
+      <nav aria-label="Guide sections">
+        <h2>Sections</h2>
+        <a href="#big-picture">Big Picture</a>
+        <a href="#docker-basics">Docker Basics</a>
+        <a href="#storefront">Storefront Dockerfile</a>
+        <a href="#api">Commerce API Dockerfile</a>
+        <a href="#dockerignore">Dockerignore Files</a>
+        <a href="#build-commands">Build Commands</a>
+      </nav>
+
+      <div>
+        <section id="big-picture">
+          <h2>1. Big Picture</h2>
+          <p>
+            Unit 08A needs Jenkins to create deployable container images. The
+            Dockerfiles define how to package each app so ECS can run it later.
+          </p>
+          <div class="grid">
+            <div class="tile">
+              <h3>Storefront</h3>
+              <p>
+                Builds the Next.js app with all development dependencies, then
+                creates a smaller production image that runs
+                <code>next start</code> on port <code>3000</code>.
+              </p>
+            </div>
+            <div class="tile">
+              <h3>Commerce API</h3>
+              <p>
+                Installs the FastAPI service with production Python
+                dependencies only, then runs <code>uvicorn</code> on port
+                <code>8000</code>.
+              </p>
+            </div>
+          </div>
+          <div class="callout">
+            <strong>Beginner translation:</strong> each Dockerfile is a recipe
+            for turning source code into a self-contained runtime image.
+          </div>
+        </section>
+
+        <section id="docker-basics">
+          <h2>2. Docker Basics Used Here</h2>
+          <ul>
+            <li>
+              <code>FROM</code> starts a new image stage from a base image.
+            </li>
+            <li>
+              <code>WORKDIR</code> sets the folder where later commands run.
+            </li>
+            <li>
+              <code>ENV</code> sets environment variables inside the image.
+            </li>
+            <li>
+              <code>COPY</code> copies files from the build context or another
+              stage.
+            </li>
+            <li>
+              <code>RUN</code> executes a build-time command and saves the
+              result in the image layer.
+            </li>
+            <li>
+              <code>USER</code> makes the final container run as a non-root
+              user.
+            </li>
+            <li>
+              <code>EXPOSE</code> documents the container port the app listens
+              on.
+            </li>
+            <li>
+              <code>CMD</code> is the default command when the container starts.
+            </li>
+          </ul>
+          <p>
+            Both files use multi-stage builds. Earlier stages can install tools
+            or build code. The final stage copies only what the app needs at
+            runtime.
+          </p>
+        </section>
+
+        <section id="storefront">
+          <h2>3. Storefront Dockerfile</h2>
+          <p>
+            File:
+            <code>apps/storefront/Dockerfile</code>
+          </p>
+
+          <h3>Full file</h3>
+          <pre><code># syntax=docker/dockerfile:1.7
+
+FROM node:22-alpine AS base
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable &amp;&amp; corepack prepare pnpm@10.26.0 --activate
+
+FROM base AS deps
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=commerceos-storefront-pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store &amp;&amp; \
+    pnpm install --frozen-lockfile
+
+FROM base AS build
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm build
+
+FROM base AS production-deps
+COPY package.json pnpm-lock.yaml ./
+RUN --mount=type=cache,id=commerceos-storefront-pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store &amp;&amp; \
+    pnpm install --prod --frozen-lockfile
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup -S nextjs &amp;&amp; adduser -S nextjs -G nextjs
+
+COPY --from=production-deps /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/public ./public
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/next.config.ts ./next.config.ts
+
+USER nextjs
+EXPOSE 3000
+
+CMD ["node_modules/.bin/next", "start"]</code></pre>
+
+          <div class="flow">
+            <div class="step">
+              <div class="number">1</div>
+              <div>
+                <h3>Enable Dockerfile 1.7 syntax</h3>
+                <p>
+                  <code># syntax=docker/dockerfile:1.7</code> enables newer
+                  BuildKit features, including cache mounts used by pnpm.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">2</div>
+              <div>
+                <h3>Create the shared Node base stage</h3>
+                <p>
+                  <code>FROM node:22-alpine AS base</code> starts from a small
+                  Node.js Linux image. <code>WORKDIR /app</code> sets the
+                  application folder. <code>NEXT_TELEMETRY_DISABLED=1</code>
+                  prevents Next.js telemetry during builds and runtime.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">3</div>
+              <div>
+                <h3>Install the package manager</h3>
+                <p>
+                  <code>corepack enable</code> makes Corepack available, and
+                  <code>corepack prepare pnpm@10.26.0 --activate</code> pins
+                  pnpm for repeatable container builds.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">4</div>
+              <div>
+                <h3>Install all dependencies in the deps stage</h3>
+                <p>
+                  The <code>deps</code> stage copies only
+                  <code>package.json</code> and <code>pnpm-lock.yaml</code>,
+                  then runs <code>pnpm install --frozen-lockfile</code>. This
+                  installs both production and development packages because the
+                  build needs TypeScript, Next.js build tooling, and other dev
+                  dependencies.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">5</div>
+              <div>
+                <h3>Use a pnpm cache mount</h3>
+                <p>
+                  <code>--mount=type=cache</code> stores downloaded packages
+                  outside the image layer. Repeated builds can reuse that cache
+                  without copying it into the final image.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">6</div>
+              <div>
+                <h3>Build the Next.js app</h3>
+                <p>
+                  The <code>build</code> stage copies
+                  <code>node_modules</code> from <code>deps</code>, copies the
+                  app source, and runs <code>pnpm build</code>. This creates the
+                  optimized <code>.next</code> production output.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">7</div>
+              <div>
+                <h3>Install production dependencies separately</h3>
+                <p>
+                  The <code>production-deps</code> stage runs
+                  <code>pnpm install --prod --frozen-lockfile</code>. This
+                  gives the final image only runtime packages, not test or build
+                  tooling.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">8</div>
+              <div>
+                <h3>Create the runtime stage</h3>
+                <p>
+                  <code>FROM node:22-alpine AS runner</code> starts a clean
+                  final image. It sets <code>NODE_ENV=production</code> so the
+                  app runs in production mode.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">9</div>
+              <div>
+                <h3>Add a non-root user</h3>
+                <p>
+                  <code>addgroup</code> and <code>adduser</code> create a
+                  dedicated <code>nextjs</code> user. Running as non-root limits
+                  damage if the app process is compromised.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">10</div>
+              <div>
+                <h3>Copy runtime files into the final image</h3>
+                <p>
+                  The runner copies production <code>node_modules</code>,
+                  <code>.next</code>, <code>public</code>,
+                  <code>package.json</code>, and <code>next.config.ts</code>.
+                  It does not copy tests, source control files, or local build
+                  artifacts.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">11</div>
+              <div>
+                <h3>Set the runtime command</h3>
+                <p>
+                  <code>USER nextjs</code> switches away from root.
+                  <code>EXPOSE 3000</code> documents the Next.js port.
+                  <code>CMD ["node_modules/.bin/next", "start"]</code> starts
+                  the production server.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="api">
+          <h2>4. Commerce API Dockerfile</h2>
+          <p>
+            File:
+            <code>services/commerce-api/Dockerfile</code>
+          </p>
+
+          <h3>Full file</h3>
+          <pre><code># syntax=docker/dockerfile:1.7
+
+FROM python:3.12-slim AS base
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+WORKDIR /app
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.7 /uv /uvx /bin/
+
+FROM base AS deps
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+FROM base AS runner
+COPY --from=deps /app/.venv ./.venv
+COPY pyproject.toml uv.lock README.md alembic.ini ./
+COPY alembic ./alembic
+COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+RUN useradd --create-home --shell /usr/sbin/nologin commerce-api &amp;&amp; \
+    chown -R commerce-api:commerce-api /app
+
+USER commerce-api
+EXPOSE 8000
+
+CMD ["uvicorn", "commerce_api.main:app", "--host", "0.0.0.0", "--port", "8000"]</code></pre>
+
+          <div class="flow">
+            <div class="step">
+              <div class="number">1</div>
+              <div>
+                <h3>Enable Dockerfile 1.7 syntax</h3>
+                <p>
+                  The syntax line enables BuildKit cache mounts for faster
+                  Python dependency installs.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">2</div>
+              <div>
+                <h3>Create the shared Python base stage</h3>
+                <p>
+                  <code>FROM python:3.12-slim AS base</code> starts from a
+                  minimal Python image. The environment variables avoid
+                  <code>.pyc</code> writes during normal execution, keep logs
+                  unbuffered, ask uv to compile bytecode at install time, and
+                  make uv copy packages into the environment.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">3</div>
+              <div>
+                <h3>Install uv from the official image</h3>
+                <p>
+                  <code>COPY --from=ghcr.io/astral-sh/uv:0.11.7</code> copies
+                  the uv binaries into the Python image without installing uv
+                  through pip or a shell script.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">4</div>
+              <div>
+                <h3>Install production dependencies first</h3>
+                <p>
+                  The <code>deps</code> stage copies <code>pyproject.toml</code>
+                  and <code>uv.lock</code>, then runs
+                  <code>uv sync --frozen --no-dev --no-install-project</code>.
+                  This installs locked production dependencies but skips the
+                  project package because source code has not been copied yet.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">5</div>
+              <div>
+                <h3>Use a uv cache mount</h3>
+                <p>
+                  The cache at <code>/root/.cache/uv</code> speeds up repeated
+                  builds and stays out of the final image layers.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">6</div>
+              <div>
+                <h3>Create the runtime stage</h3>
+                <p>
+                  The <code>runner</code> stage starts from the same base image,
+                  copies the virtual environment from <code>deps</code>, then
+                  copies project metadata, Alembic files, and application
+                  source code.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">7</div>
+              <div>
+                <h3>Install the project package</h3>
+                <p>
+                  <code>uv sync --frozen --no-dev</code> runs again after source
+                  code is present. This installs <code>commerce-api</code>
+                  itself into the virtual environment without dev dependencies.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">8</div>
+              <div>
+                <h3>Put the virtual environment on PATH</h3>
+                <p>
+                  <code>ENV PATH="/app/.venv/bin:$PATH"</code> lets the final
+                  command call <code>uvicorn</code> directly from the locked
+                  virtual environment.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">9</div>
+              <div>
+                <h3>Add a non-root service user</h3>
+                <p>
+                  <code>useradd</code> creates <code>commerce-api</code> with a
+                  disabled login shell. <code>chown</code> gives that user
+                  ownership of <code>/app</code>.
+                </p>
+              </div>
+            </div>
+            <div class="step">
+              <div class="number">10</div>
+              <div>
+                <h3>Set the runtime command</h3>
+                <p>
+                  <code>USER commerce-api</code> runs the app as the service
+                  user. <code>EXPOSE 8000</code> documents the API port.
+                  <code>CMD</code> starts Uvicorn and binds to
+                  <code>0.0.0.0</code> so ECS can route traffic to the
+                  container.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="dockerignore">
+          <h2>5. Dockerignore Files</h2>
+          <p>
+            The <code>.dockerignore</code> files keep local-only files out of
+            Docker build contexts. That makes builds faster and prevents local
+            artifacts from accidentally entering images.
+          </p>
+
+          <h3>Storefront ignores</h3>
+          <ul>
+            <li><code>node_modules</code> because dependencies are installed inside Docker.</li>
+            <li><code>.next</code> because the container build creates a fresh production build.</li>
+            <li><code>.env*</code> because secrets and local config do not belong in images.</li>
+            <li><code>coverage</code>, <code>test-results</code>, and debug logs because they are local outputs.</li>
+          </ul>
+
+          <h3>Commerce API ignores</h3>
+          <ul>
+            <li><code>.venv</code> because uv creates the virtual environment inside Docker.</li>
+            <li><code>.pytest_cache</code>, <code>__pycache__</code>, and <code>*.pyc</code> because they are local cache files.</li>
+            <li><code>.env*</code> because runtime secrets should come from the environment or AWS secrets.</li>
+            <li><code>dist</code> and coverage folders because the Dockerfile builds from source.</li>
+          </ul>
+        </section>
+
+        <section id="build-commands">
+          <h2>6. Build Commands</h2>
+          <p>
+            These are the local image build commands used for Unit 08A
+            verification.
+          </p>
+          <pre><code>docker build \
+  --file apps/storefront/Dockerfile \
+  --tag commerceos-storefront:08a-local \
+  apps/storefront
+
+docker build \
+  --file services/commerce-api/Dockerfile \
+  --tag commerceos-api:08a-local \
+  services/commerce-api</code></pre>
+
+          <div class="callout success">
+            <strong>What success means:</strong> Docker can build both runtime
+            images from the repository source. A later Jenkins run still needs
+            to push those images to ECR.
+          </div>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

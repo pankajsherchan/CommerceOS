@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CommerceOS Unit 08A Jenkins Pipeline Guide</title>
+    <style>
+      :root {
+        --bg: #f6f2eb;
+        --surface: #fffaf4;
+        --elevated: #ffffff;
+        --text: #1d2430;
+        --muted: #5f6674;
+        --accent: #b85c2d;
+        --accent-soft: #f2d7c7;
+        --border: #d7cbbd;
+        --code-bg: #111925;
+        --code-text: #e6edf3;
+        --ok: #157347;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        line-height: 1.6;
+      }
+
+      header {
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+
+      .wrap {
+        width: min(1120px, calc(100% - 32px));
+        margin: 0 auto;
+      }
+
+      .hero {
+        padding: 48px 0 32px;
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--accent);
+        font-size: 0.8rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        line-height: 1.15;
+      }
+
+      h1 {
+        max-width: 820px;
+        margin: 0;
+        font-size: clamp(2rem, 5vw, 4rem);
+      }
+
+      .subtitle {
+        max-width: 780px;
+        margin: 18px 0 0;
+        color: var(--muted);
+        font-size: 1.1rem;
+      }
+
+      main {
+        padding: 28px 0 56px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        gap: 28px;
+        align-items: start;
+      }
+
+      nav {
+        position: sticky;
+        top: 16px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      nav h2 {
+        margin: 0 0 10px;
+        font-size: 0.95rem;
+      }
+
+      nav a {
+        display: block;
+        padding: 7px 0;
+        color: var(--muted);
+        text-decoration: none;
+      }
+
+      nav a:hover,
+      nav a:focus {
+        color: var(--accent);
+      }
+
+      section {
+        margin-bottom: 28px;
+        padding: 24px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      section h2 {
+        margin: 0 0 14px;
+        font-size: 1.6rem;
+      }
+
+      section h3 {
+        margin: 22px 0 8px;
+        font-size: 1.1rem;
+      }
+
+      p {
+        margin: 0 0 14px;
+      }
+
+      ul,
+      ol {
+        margin: 0 0 14px 1.2rem;
+        padding: 0;
+      }
+
+      li {
+        margin: 7px 0;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 14px 0;
+        background: var(--elevated);
+      }
+
+      th,
+      td {
+        padding: 10px;
+        border: 1px solid var(--border);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: var(--accent-soft);
+      }
+
+      code {
+        border-radius: 5px;
+        background: var(--accent-soft);
+        padding: 0.1rem 0.32rem;
+        font-size: 0.92em;
+      }
+
+      pre {
+        overflow-x: auto;
+        margin: 14px 0;
+        padding: 16px;
+        border-radius: 8px;
+        background: var(--code-bg);
+        color: var(--code-text);
+      }
+
+      pre code {
+        background: transparent;
+        color: inherit;
+        padding: 0;
+      }
+
+      .callout {
+        margin: 16px 0;
+        padding: 14px 16px;
+        border-left: 4px solid var(--accent);
+        border-radius: 6px;
+        background: var(--elevated);
+      }
+
+      .success {
+        border-left-color: var(--ok);
+      }
+
+      .flow {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--elevated);
+      }
+
+      .number {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff8f2;
+        font-weight: 800;
+      }
+
+      .step h3 {
+        margin: 2px 0 5px;
+      }
+
+      .step p {
+        margin-bottom: 0;
+      }
+
+      @media (max-width: 860px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        nav {
+          position: static;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap hero">
+        <p class="eyebrow">CommerceOS Unit 08A</p>
+        <h1>Jenkins pipeline, explained step by step</h1>
+        <p class="subtitle">
+          This guide explains the Jenkinsfile that verifies the repository,
+          builds Docker images, and publishes the storefront and commerce API
+          images to dev ECR repositories.
+        </p>
+      </div>
+    </header>
+
+    <main class="wrap layout">
+      <nav aria-label="Guide sections">
+        <h2>Sections</h2>
+        <a href="#big-picture">Big Picture</a>
+        <a href="#helpers">Helper Functions</a>
+        <a href="#pipeline-settings">Pipeline Settings</a>
+        <a href="#parameters">Parameters</a>
+        <a href="#stages">Stages</a>
+        <a href="#tags">Image Tags</a>
+        <a href="#not-included">Not Included</a>
+      </nav>
+
+      <div>
+        <section id="big-picture">
+          <h2>1. Big Picture</h2>
+          <p>
+            The Unit 08A Jenkinsfile is an artifact publishing pipeline. It
+            proves the codebase can pass checks, build production images, and
+            push those images to ECR. It does not deploy the images to ECS.
+          </p>
+          <div class="callout">
+            <strong>Beginner translation:</strong> Jenkins is acting like a
+            repeatable release workstation. It checks the code, builds the
+            images, labels them, and uploads them to AWS.
+          </div>
+        </section>
+
+        <section id="helpers">
+          <h2>2. Helper Functions</h2>
+          <p>
+            The Jenkinsfile starts with small Groovy helper functions so the
+            main pipeline stages stay readable.
+          </p>
+
+          <h3><code>validateRequiredParam</code></h3>
+          <pre><code>def validateRequiredParam(String name) {
+  if (!params[name]?.trim()) {
+    error("${name} is required")
+  }
+}</code></pre>
+          <p>
+            This checks that a required Jenkins parameter is not blank. If it is
+            blank, the build stops with a clear error before any expensive work
+            runs.
+          </p>
+
+          <h3><code>loginToEcr</code></h3>
+          <pre><code>aws ecr get-login-password --region '${region}' |
+  docker login --username AWS --password-stdin '${registry}'</code></pre>
+          <p>
+            This gets a temporary ECR login password from AWS CLI and passes it
+            to Docker. After that, Docker can push images to that ECR registry.
+          </p>
+
+          <h3><code>pushImageTags</code></h3>
+          <p>
+            This pushes the tags Jenkins created for one repository. It always
+            pushes immutable SHA/build tags and conditionally pushes the moving
+            latest-style tag.
+          </p>
+        </section>
+
+        <section id="pipeline-settings">
+          <h2>3. Pipeline Settings</h2>
+          <pre><code>pipeline {
+  agent any
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    disableConcurrentBuilds()
+    skipDefaultCheckout(true)
+    timestamps()
+  }
+
+  environment {
+    DOCKER_BUILDKIT = '1'
+  }
+}</code></pre>
+          <ul>
+            <li>
+              <code>agent any</code> lets Jenkins choose any compatible agent.
+              That agent must have Git, Docker, AWS CLI, Terraform, pnpm, and
+              uv installed.
+            </li>
+            <li>
+              <code>buildDiscarder</code> keeps the most recent 20 builds so
+              old logs do not grow forever.
+            </li>
+            <li>
+              <code>disableConcurrentBuilds</code> prevents two runs of this
+              job from publishing overlapping image tags at the same time.
+            </li>
+            <li>
+              <code>skipDefaultCheckout</code> means the pipeline controls
+              checkout explicitly in its first stage.
+            </li>
+            <li>
+              <code>timestamps</code> adds timestamps to logs, which helps when
+              debugging slow builds.
+            </li>
+            <li>
+              <code>DOCKER_BUILDKIT=1</code> enables Docker BuildKit, which the
+              Dockerfiles use for dependency cache mounts.
+            </li>
+          </ul>
+        </section>
+
+        <section id="parameters">
+          <h2>4. Parameters</h2>
+          <p>
+            Jenkins parameters let the same pipeline run against the dev ECR
+            repositories without hardcoding AWS account-specific values.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>What it does</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>AWS_REGION</code></td>
+                <td>The AWS region containing the ECR repositories.</td>
+              </tr>
+              <tr>
+                <td><code>STOREFRONT_ECR_REPOSITORY_URL</code></td>
+                <td>The full ECR repository URL for the storefront image.</td>
+              </tr>
+              <tr>
+                <td><code>COMMERCE_API_ECR_REPOSITORY_URL</code></td>
+                <td>The full ECR repository URL for the commerce API image.</td>
+              </tr>
+              <tr>
+                <td><code>IMAGE_TAG_PREFIX</code></td>
+                <td>
+                  The environment or channel prefix for tags. It defaults to
+                  <code>dev</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>AWS_CREDENTIALS_ID</code></td>
+                <td>
+                  Optional Jenkins AWS credential ID. Leave it blank when the
+                  Jenkins agent already has an IAM role.
+                </td>
+              </tr>
+              <tr>
+                <td><code>PUSH_DEV_LATEST</code></td>
+                <td>
+                  When enabled, also pushes a moving
+                  <code>&lt;prefix&gt;-latest</code> tag.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="stages">
+          <h2>5. Pipeline Stages</h2>
+          <div class="flow">
+            <div class="step">
+              <div class="number">1</div>
+              <div>
+                <h3>Checkout</h3>
+                <p>
+                  Jenkins checks out the repository, reads the current commit
+                  SHA with <code>git rev-parse --short=12 HEAD</code>, and
+                  builds the image tag names from the tag prefix, commit SHA,
+                  and Jenkins build number.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">2</div>
+              <div>
+                <h3>Validate Inputs</h3>
+                <p>
+                  The pipeline fails early if required values are missing:
+                  region, storefront ECR URL, API ECR URL, and tag prefix. It
+                  also checks that the tag prefix is valid for Docker tags.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">3</div>
+              <div>
+                <h3>Storefront Verification</h3>
+                <p>
+                  Jenkins runs the frontend checks from
+                  <code>apps/storefront</code>: install dependencies, lint,
+                  typecheck, run tests, and build the Next.js app.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">4</div>
+              <div>
+                <h3>Commerce API Verification</h3>
+                <p>
+                  Jenkins runs backend checks from
+                  <code>services/commerce-api</code>: sync dev dependencies,
+                  run pytest, and import the FastAPI app as a boot smoke test.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">5</div>
+              <div>
+                <h3>Terraform Static Verification</h3>
+                <p>
+                  Jenkins checks Terraform formatting, initializes the dev
+                  environment with <code>-backend=false</code>, and validates
+                  the configuration. This confirms the Terraform code is
+                  structurally valid without touching remote state.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">6</div>
+              <div>
+                <h3>Build Images</h3>
+                <p>
+                  Jenkins builds the storefront image from
+                  <code>apps/storefront</code> and the API image from
+                  <code>services/commerce-api</code>. Each build receives the
+                  immutable tags and, when enabled, a moving latest-style tag.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">7</div>
+              <div>
+                <h3>Push Images</h3>
+                <p>
+                  Jenkins extracts the ECR registry host from each repository
+                  URL, logs Docker into each unique registry, then pushes all
+                  tags for both images.
+                </p>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="number">8</div>
+              <div>
+                <h3>Post Success Message</h3>
+                <p>
+                  On success, Jenkins prints the combined immutable tag so the
+                  image version is easy to find in the logs.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tags">
+          <h2>6. Image Tags</h2>
+          <p>
+            Each image gets multiple tags so humans and automation can refer to
+            the same build in different ways.
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Tag</th>
+                <th>Example</th>
+                <th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>&lt;prefix&gt;-&lt;short-sha&gt;</code></td>
+                <td><code>dev-a1b2c3d4e5f6</code></td>
+                <td>Links the image to a Git commit.</td>
+              </tr>
+              <tr>
+                <td><code>&lt;prefix&gt;-build-&lt;number&gt;</code></td>
+                <td><code>dev-build-42</code></td>
+                <td>Links the image to a Jenkins build.</td>
+              </tr>
+              <tr>
+                <td><code>&lt;prefix&gt;-&lt;short-sha&gt;-b&lt;number&gt;</code></td>
+                <td><code>dev-a1b2c3d4e5f6-b42</code></td>
+                <td>Combines Git and Jenkins identity in one immutable tag.</td>
+              </tr>
+              <tr>
+                <td><code>&lt;prefix&gt;-latest</code></td>
+                <td><code>dev-latest</code></td>
+                <td>
+                  Convenience tag that moves with each successful run when
+                  enabled.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="callout success">
+            <strong>Why immutable tags matter:</strong> ECS deployment work can
+            later point to a specific build and avoid ambiguity about which
+            code is running.
+          </div>
+        </section>
+
+        <section id="not-included">
+          <h2>7. Not Included In Unit 08A</h2>
+          <p>
+            This pipeline intentionally stops after image publishing. These
+            tasks belong to later work:
+          </p>
+          <ul>
+            <li>Terraform remote state setup.</li>
+            <li>Terraform plan or apply against AWS.</li>
+            <li>ECS service deployment or task count changes.</li>
+            <li>Database migrations.</li>
+            <li>Dev ALB smoke tests.</li>
+            <li>Keycloak or auth verification.</li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+.env
+.env.*
+.git
+.pytest_cache
+.venv
+Dockerfile
+__pycache__
+*.py[cod]
+dist
+htmlcov
+.mypy_cache
+.ruff_cache
