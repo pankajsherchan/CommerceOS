@@ -21,6 +21,7 @@ implementations are intentionally deferred until later units justify them.
 - `pnpm`
 - Python `3.12`
 - `uv`
+- Docker or another local Keycloak runtime for storefront auth
 
 ## Repository Layout
 
@@ -28,7 +29,7 @@ implementations are intentionally deferred until later units justify them.
 - `apps/admin` - future admin application placeholder
 - `services/commerce-api` - future FastAPI service skeleton
 - `services/worker` - future async worker placeholder
-- `platform/keycloak` - future auth configuration placeholder
+- `platform/keycloak` - local Keycloak realm and storefront OIDC client config
 - `platform/jenkins` - future CI/CD configuration placeholder
 - `infra/terraform` - future infrastructure placeholder
 - `docs` - future long-lived project documentation
@@ -45,6 +46,10 @@ cd apps/storefront
 pnpm install
 pnpm dev
 ```
+
+Storefront auth requires a local Keycloak realm import from
+`platform/keycloak/realm-commerceos.json` plus an `apps/storefront/.env.local`
+file based on `apps/storefront/.env.example`.
 
 Useful storefront commands:
 

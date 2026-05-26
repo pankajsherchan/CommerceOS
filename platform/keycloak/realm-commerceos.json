@@ -1,0 +1,54 @@
+{
+  "realm": "commerceos",
+  "enabled": true,
+  "displayName": "CommerceOS",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "verifyEmail": false,
+  "clients": [
+    {
+      "clientId": "commerceos-storefront",
+      "name": "CommerceOS Storefront",
+      "description": "Local development OIDC client for the customer storefront.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/auth/callback",
+        "http://localhost:3001/auth/callback",
+        "http://127.0.0.1:3000/auth/callback",
+        "http://127.0.0.1:3001/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:3001/*##http://127.0.0.1:3000/*##http://127.0.0.1:3001/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    }
+  ]
+}

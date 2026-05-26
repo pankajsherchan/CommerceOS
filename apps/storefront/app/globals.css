@@ -198,6 +198,17 @@ button:disabled {
   color: var(--text-primary);
 }
 
+.auth-action-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.nav-button {
+  min-height: 2.35rem;
+  padding: 0.5rem 0.78rem;
+}
+
 .cart-count {
   display: inline-flex;
   min-width: 1.45rem;
@@ -225,7 +236,8 @@ button:disabled {
 .catalog-layout,
 .detail-layout,
 .cart-layout,
-.checkout-layout {
+.checkout-layout,
+.account-layout {
   display: grid;
   gap: 2rem;
 }
@@ -316,7 +328,8 @@ button:disabled {
 .summary-panel,
 .checkout-section,
 .empty-state,
-.confirmation-panel {
+.confirmation-panel,
+.account-panel {
   border: 1px solid var(--line-soft);
   border-radius: 1rem;
   background: rgb(255 255 255 / 0.72);
@@ -327,7 +340,8 @@ button:disabled {
 .summary-panel,
 .checkout-section,
 .empty-state,
-.confirmation-panel {
+.confirmation-panel,
+.account-panel {
   padding: 1.35rem;
 }
 
@@ -676,7 +690,8 @@ button:disabled {
 }
 
 .cart-layout,
-.checkout-layout {
+.checkout-layout,
+.account-layout {
   grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem);
   align-items: start;
 }
@@ -770,6 +785,37 @@ button:disabled {
   max-width: 44rem;
 }
 
+.account-panel,
+.account-details {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.account-primary {
+  font-size: 1.25rem;
+  font-weight: 750;
+  margin: 0.4rem 0 0;
+}
+
+.account-details {
+  margin: 0;
+}
+
+.account-details div {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 0.9rem;
+}
+
+.account-details dt {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.account-details dd {
+  margin: 0.3rem 0 0;
+  overflow-wrap: anywhere;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -838,7 +884,8 @@ button:disabled {
   .catalog-layout,
   .detail-layout,
   .cart-layout,
-  .checkout-layout {
+  .checkout-layout,
+  .account-layout {
     grid-template-columns: 1fr;
   }
 
@@ -917,7 +964,8 @@ button:disabled {
   .summary-panel,
   .checkout-section,
   .empty-state,
-  .confirmation-panel {
+  .confirmation-panel,
+  .account-panel {
     padding: 1.1rem;
   }
 

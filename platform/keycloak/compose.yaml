@@ -1,0 +1,18 @@
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.1
+    container_name: commerceos-keycloak
+    command:
+      - start-dev
+      - --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+      - ./realm-commerceos.json:/opt/keycloak/data/import/realm-commerceos.json:ro
+
+volumes:
+  keycloak-data:
