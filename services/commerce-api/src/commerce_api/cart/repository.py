@@ -1,76 +1,106 @@
-from threading import RLock
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from commerce_api.cart.schemas import AddCartItemRequest, CartLine, UpdateCartItemRequest
+from commerce_api.models import CartItemModel
+from commerce_api.seed import STARTER_CART_KEY
 
 
-class InMemoryCartRepository:
-    def __init__(self, initial_lines: list[CartLine]) -> None:
-        self._initial_lines = [line.model_copy() for line in initial_lines]
-        self._lines = [line.model_copy() for line in initial_lines]
-        self._lock = RLock()
+def list_lines(session: Session, cart_key: str = STARTER_CART_KEY) -> list[CartLine]:
+    rows = session.scalars(cart_statement(cart_key)).all()
 
-    def reset(self) -> None:
-        with self._lock:
-            self._lines = [line.model_copy() for line in self._initial_lines]
-
-    def list_lines(self) -> list[CartLine]:
-        with self._lock:
-            return [line.model_copy() for line in self._lines]
-
-    def add_or_update_item(self, item: AddCartItemRequest) -> list[CartLine]:
-        with self._lock:
-            for index, line in enumerate(self._lines):
-                if line.product_slug == item.product_slug and line.size == item.size:
-                    next_quantity = min(line.quantity + item.quantity, 99)
-                    self._lines[index] = line.model_copy(
-                        update={"quantity": next_quantity},
-                    )
-                    break
-            else:
-                self._lines.append(
-                    CartLine(
-                        product_slug=item.product_slug,
-                        quantity=item.quantity,
-                        size=item.size,
-                    ),
-                )
-
-            return [line.model_copy() for line in self._lines]
-
-    def set_item_quantity(self, item: UpdateCartItemRequest) -> list[CartLine] | None:
-        with self._lock:
-            for index, line in enumerate(self._lines):
-                if line.product_slug == item.product_slug and line.size == item.size:
-                    self._lines[index] = line.model_copy(
-                        update={"quantity": item.quantity},
-                    )
-                    return [line.model_copy() for line in self._lines]
-
-            return None
-
-    def remove_item(self, product_slug: str, size: str) -> list[CartLine] | None:
-        with self._lock:
-            next_lines = [
-                line
-                for line in self._lines
-                if not (line.product_slug == product_slug and line.size == size)
-            ]
-
-            if len(next_lines) == len(self._lines):
-                return None
-
-            self._lines = next_lines
-            return [line.model_copy() for line in self._lines]
-
-    def clear(self) -> list[CartLine]:
-        with self._lock:
-            self._lines = []
-            return []
+    return [to_cart_line(row) for row in rows]
 
 
-cart_repository = InMemoryCartRepository(
-    initial_lines=[
-        CartLine(product_slug="harbor-monitor-stand", quantity=1, size="Standard"),
-        CartLine(product_slug="draft-paper-tower", quantity=2, size="One size"),
-    ],
-)
+def add_or_update_item(
+    session: Session,
+    item: AddCartItemRequest,
+    cart_key: str = STARTER_CART_KEY,
+) -> list[CartLine]:
+    row = session.scalar(
+        cart_statement(cart_key)
+        .where(CartItemModel.product_slug == item.product_slug)
+        .where(CartItemModel.size == item.size),
+    )
+
+    if row is None:
+        session.add(
+            CartItemModel(
+                cart_key=cart_key,
+                product_slug=item.product_slug,
+                quantity=item.quantity,
+                size=item.size,
+            ),
+        )
+    else:
+        row.quantity = min(row.quantity + item.quantity, 99)
+
+    session.flush()
+    return list_lines(session, cart_key)
+
+
+def set_item_quantity(
+    session: Session,
+    item: UpdateCartItemRequest,
+    cart_key: str = STARTER_CART_KEY,
+) -> list[CartLine] | None:
+    row = session.scalar(
+        cart_statement(cart_key)
+        .where(CartItemModel.product_slug == item.product_slug)
+        .where(CartItemModel.size == item.size),
+    )
+
+    if row is None:
+        return None
+
+    row.quantity = item.quantity
+    session.flush()
+
+    return list_lines(session, cart_key)
+
+
+def remove_item(
+    session: Session,
+    product_slug: str,
+    size: str,
+    cart_key: str = STARTER_CART_KEY,
+) -> list[CartLine] | None:
+    row = session.scalar(
+        cart_statement(cart_key)
+        .where(CartItemModel.product_slug == product_slug)
+        .where(CartItemModel.size == size),
+    )
+
+    if row is None:
+        return None
+
+    session.delete(row)
+    session.flush()
+
+    return list_lines(session, cart_key)
+
+
+def clear(session: Session, cart_key: str = STARTER_CART_KEY) -> list[CartLine]:
+    rows = session.scalars(cart_statement(cart_key)).all()
+
+    for row in rows:
+        session.delete(row)
+
+    session.flush()
+    return []
+
+
+def cart_statement(cart_key: str):
+    return (
+        select(CartItemModel)
+        .where(CartItemModel.cart_key == cart_key)
+        .order_by(CartItemModel.id)
+    )
+
+
+def to_cart_line(row: CartItemModel) -> CartLine:
+    return CartLine(
+        product_slug=row.product_slug,
+        quantity=row.quantity,
+        size=row.size,
+    )

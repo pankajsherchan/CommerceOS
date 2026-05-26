@@ -7,38 +7,29 @@
 - [x] 03 Setup Storefront Pages
 - [x] 04 Setup Auth
 - [x] 05 Setup API Endpoints
+- [x] 06 Setup DB
+- [ ] 07 Setup TF
+- [ ] 08 Setup Jenkins
+- [ ] 09 Setup Logger
 
-Current unit: 05 Setup API Endpoints
+Current unit: 06 Setup DB
 
 Status: implemented and verified.
 
 Completed scope:
 
-- Added the first FastAPI app with health, catalog, product detail, cart read,
-  and placeholder-authenticated cart item write/update/remove/clear endpoints.
-- Kept catalog and cart data in memory for Phase 0, with explicit Pydantic
-  request and response models.
-- Wired storefront catalog/product/cart reads through a small typed API client.
-- Wired storefront cart add, quantity, remove, and sample-order clear actions
-  through route handlers that proxy to the commerce API.
-- Removed storefront catalog/cart fixture fallbacks; failed API list reads now
-  resolve to empty arrays, and cart display enriches lines from API-loaded
-  products.
+- Added Docker Compose PostgreSQL for local development.
+- Added SQLAlchemy 2.0 models, request-scoped DB sessions, and Alembic
+  migrations for catalog and placeholder cart tables.
+- Seeded the Phase 0 starter categories, products, and cart lines through the
+  initial migration.
+- Replaced in-memory catalog and cart repositories with DB-backed repositories
+  while preserving the Unit 05 API contract.
+- Updated backend tests to use isolated seeded database sessions.
 
-Next unit: 06 Setup Logger.
+Next unit: 07 Setup TF.
 
 ## Phase 1
 
-- [ ] 03 Setup Logger
-- [ ] 04 Setup DB
-- [ ] 05 Setup Jenkins
-- [ ] 06 Setup TF
-
-## Phase 2
-
-- [ ] 01 Setup Authentication
-- [ ] 02 Setup Payment Stripe
-
-## Phase 3
-
 - [ ] 01 Microservice Setup
+- [ ] 02 Setup Payment Stripe

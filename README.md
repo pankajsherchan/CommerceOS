@@ -9,7 +9,8 @@ tooling.
 Phase 0 foundation work is in progress. The repository currently includes:
 
 - `apps/storefront` as the first runnable Next.js surface
-- `services/commerce-api` as the first Python package skeleton
+- `services/commerce-api` as the first FastAPI service with PostgreSQL-backed
+  catalog and cart endpoints
 - Placeholder directories for the remaining planned platform surfaces
 
 Shared libraries, workspace orchestration, and production feature
@@ -21,13 +22,13 @@ implementations are intentionally deferred until later units justify them.
 - `pnpm`
 - Python `3.12`
 - `uv`
-- Docker or another local Keycloak runtime for storefront auth
+- Docker for local PostgreSQL and Keycloak runtime support
 
 ## Repository Layout
 
 - `apps/storefront` - customer-facing Next.js storefront skeleton
 - `apps/admin` - future admin application placeholder
-- `services/commerce-api` - future FastAPI service skeleton
+- `services/commerce-api` - FastAPI commerce API
 - `services/worker` - future async worker placeholder
 - `platform/keycloak` - local Keycloak realm and storefront OIDC client config
 - `platform/jenkins` - future CI/CD configuration placeholder
@@ -60,18 +61,24 @@ pnpm test
 pnpm build
 ```
 
-### Commerce API Skeleton
+### Commerce API
 
 Set up the Python package from its own directory:
 
 ```bash
+docker compose up -d postgres
 cd services/commerce-api
-uv sync
-uv run python -c "import commerce_api"
+uv sync --dev
+uv run alembic upgrade head
+uv run uvicorn commerce_api.main:app --reload
 ```
 
-This service is intentionally only a package skeleton in Phase 0. It does not
-include a FastAPI app, routes, or database wiring yet.
+Useful commerce API commands:
+
+```bash
+uv run pytest
+uv run python -c "from commerce_api.main import app; print(app.title)"
+```
 
 ## Tooling Strategy
 
