@@ -40,11 +40,7 @@ def resolveStorefrontRepositoryUrl(String repositoryName, String region) {
 }
 
 pipeline {
-  agent {
-        docker {
-            image 'amazon/aws-cli'
-        }
-    }
+  agent any
 
   options {
     buildDiscarder(logRotator(numToKeepStr: '20'))
@@ -61,12 +57,21 @@ pipeline {
   }
 
   stages {
-     stage('AWS CLI Test') {
-            steps {
-                sh 'aws --version'
-            }
-        }
     
+     stage('Install AWS CLI') {
+        steps {
+            sh '''
+                curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+
+                unzip awscliv2.zip
+
+                sudo ./aws/install
+
+                aws --version
+            '''
+        }
+    }  
+
     stage('Checkout') {
       steps {
         checkout scm
