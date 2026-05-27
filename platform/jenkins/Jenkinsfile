@@ -1,85 +1,49 @@
-def validateRequiredParam(String name) {
-  if (!params[name]?.trim()) {
+def validateRequiredValue(String name, String value) {
+  if (!value?.trim()) {
     error("${name} is required")
   }
 }
 
-def normalizeBranchName(String branchName) {
-  if (!branchName?.trim()) {
-    return ''
+def validateAwsRegion(String region) {
+  validateRequiredValue('AWS_REGION', region)
+  if (!(region ==~ /[a-z]{2}(-[a-z]+)+-[0-9]+/)) {
+    error('AWS_REGION must look like us-west-2.')
   }
-
-  def normalized = branchName.trim()
-  normalized = normalized.replaceFirst(/^refs\/heads\//, '')
-  normalized = normalized.replaceFirst(/^remotes\/origin\//, '')
-  normalized = normalized.replaceFirst(/^origin\//, '')
-  return normalized
 }
 
-def detectBuildBranch() {
-  def candidates = [
-    env.BRANCH_NAME,
-    env.GIT_LOCAL_BRANCH,
-    env.GIT_BRANCH,
-  ]
+def validateDockerTagPrefix(String prefix) {
+  validateRequiredValue('IMAGE_TAG_PREFIX', prefix)
+  if (!(prefix ==~ /[a-z0-9][a-z0-9._-]*/)) {
+    error('IMAGE_TAG_PREFIX must be a valid lowercase Docker tag prefix.')
+  }
+}
 
-  for (candidate in candidates) {
-    def branchName = normalizeBranchName(candidate)
-    if (branchName && branchName != 'HEAD') {
-      return branchName
-    }
+def validateEcrRepositoryName(String value) {
+  validateRequiredValue('STOREFRONT_ECR_REPOSITORY_NAME', value)
+  if (!(value ==~ /[a-z0-9]+([._\/-][a-z0-9]+)*/)) {
+    error('STOREFRONT_ECR_REPOSITORY_NAME must be a valid ECR repository name.')
+  }
+}
+
+def resolveStorefrontRepositoryUrl(String configuredUrl, String repositoryName, String region) {
+  if (configuredUrl?.trim()) {
+    return configuredUrl.trim()
   }
 
-  def gitBranch = sh(
-    label: 'Detect checked out branch',
+  def effectiveRepositoryName = repositoryName?.trim() ?: 'commerce-os-dev-storefront'
+  validateEcrRepositoryName(effectiveRepositoryName)
+
+  return sh(
+    label: 'Resolve storefront ECR repository URL',
     returnStdout: true,
-    script: 'git rev-parse --abbrev-ref HEAD || true'
+    script: """
+      aws ecr describe-repositories \\
+        --region '${region}' \\
+        --repository-names '${effectiveRepositoryName}' \\
+        --query 'repositories[0].repositoryUri' \\
+        --output text
+    """.stripIndent()
   ).trim()
-  def checkedOutBranch = normalizeBranchName(gitBranch)
-  if (checkedOutBranch && checkedOutBranch != 'HEAD') {
-    return checkedOutBranch
-  }
-
-  return ''
-}
-
-def requireBranch(String branchName, String purpose) {
-  def expectedBranch = normalizeBranchName(branchName)
-  if (!expectedBranch) {
-    error("Expected branch is required for ${purpose}.")
-  }
-  if (!env.DETECTED_BRANCH?.trim()) {
-    error("Could not determine the SCM branch for ${purpose}.")
-  }
-  if (env.CHANGE_ID?.trim()) {
-    error("${purpose} is disabled for change request builds.")
-  }
-  if (env.DETECTED_BRANCH != expectedBranch) {
-    error("${purpose} is limited to ${expectedBranch}; detected ${env.DETECTED_BRANCH}.")
-  }
-}
-
-def loginToEcr(String registry, String region) {
-  sh(
-    label: "Authenticate Docker to ${registry}",
-    script: """
-      aws ecr get-login-password --region '${region}' | docker login --username AWS --password-stdin '${registry}'
-    """.stripIndent()
-  )
-}
-
-def pushImageTags(String repositoryUrl) {
-  sh(
-    label: "Push ${repositoryUrl}",
-    script: """
-      docker push '${repositoryUrl}:${env.IMAGE_SHA_TAG}'
-      docker push '${repositoryUrl}:${env.IMAGE_BUILD_TAG}'
-      docker push '${repositoryUrl}:${env.IMAGE_COMBINED_TAG}'
-      if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
-        docker push '${repositoryUrl}:${env.IMAGE_LATEST_TAG}'
-      fi
-    """.stripIndent()
-  )
 }
 
 def withAwsCredentials(Closure body) {
@@ -92,32 +56,6 @@ def withAwsCredentials(Closure body) {
     }
   } else {
     body()
-  }
-}
-
-def withDevTerraformCredentials(Closure body) {
-  def runWithDbPassword = {
-    if (params.DEV_DB_PASSWORD_CREDENTIALS_ID?.trim()) {
-      withCredentials([string(
-        credentialsId: params.DEV_DB_PASSWORD_CREDENTIALS_ID,
-        variable: 'TF_VAR_db_password'
-      )]) {
-        body()
-      }
-    } else {
-      body()
-    }
-  }
-
-  if (params.AWS_CREDENTIALS_ID?.trim()) {
-    withCredentials([[
-      $class: 'AmazonWebServicesCredentialsBinding',
-      credentialsId: params.AWS_CREDENTIALS_ID
-    ]]) {
-      runWithDbPassword()
-    }
-  } else {
-    runWithDbPassword()
   }
 }
 
@@ -135,27 +73,22 @@ pipeline {
     string(
       name: 'AWS_REGION',
       defaultValue: 'us-west-2',
-      description: 'AWS region containing the dev ECR repositories.'
+      description: 'AWS region containing the storefront ECR repository.'
     )
     string(
       name: 'STOREFRONT_ECR_REPOSITORY_URL',
       defaultValue: '',
-      description: 'Full ECR repository URL for the storefront image.'
+      description: 'Optional full storefront ECR repository URL. Leave blank to resolve it from AWS by repository name.'
     )
     string(
-      name: 'COMMERCE_API_ECR_REPOSITORY_URL',
-      defaultValue: '',
-      description: 'Full ECR repository URL for the commerce API image.'
+      name: 'STOREFRONT_ECR_REPOSITORY_NAME',
+      defaultValue: 'commerce-os-dev-storefront',
+      description: 'Storefront ECR repository name used when STOREFRONT_ECR_REPOSITORY_URL is blank.'
     )
     string(
       name: 'IMAGE_TAG_PREFIX',
       defaultValue: 'dev',
       description: 'Environment or channel prefix used for published image tags.'
-    )
-    string(
-      name: 'PUBLISH_BRANCH',
-      defaultValue: 'main',
-      description: 'Branch allowed to run the Phase 0 dev image-publishing job.'
     )
     string(
       name: 'AWS_CREDENTIALS_ID',
@@ -165,62 +98,7 @@ pipeline {
     booleanParam(
       name: 'PUSH_DEV_LATEST',
       defaultValue: true,
-      description: 'Also publish a moving dev-latest tag for each image.'
-    )
-    booleanParam(
-      name: 'PLAN_DEV',
-      defaultValue: false,
-      description: 'Run the remote-state Terraform dev deployment plans after image publishing.'
-    )
-    booleanParam(
-      name: 'DEPLOY_DEV',
-      defaultValue: false,
-      description: 'Apply the dev deployment after image publishing, migration, and approval.'
-    )
-    booleanParam(
-      name: 'AUTO_APPROVE_DEV_DEPLOY',
-      defaultValue: false,
-      description: 'Skip the manual approval input when DEPLOY_DEV is enabled on the approved branch.'
-    )
-    booleanParam(
-      name: 'BOOTSTRAP_REMOTE_STATE',
-      defaultValue: false,
-      description: 'Create or update the dev S3 Terraform backend bucket before planning.'
-    )
-    booleanParam(
-      name: 'MIGRATE_LOCAL_STATE',
-      defaultValue: false,
-      description: 'Run terraform init with -migrate-state -force-copy for dev remote state migration.'
-    )
-    string(
-      name: 'TF_BACKEND_BUCKET',
-      defaultValue: '',
-      description: 'S3 bucket name for dev Terraform state.'
-    )
-    string(
-      name: 'TF_BACKEND_KEY',
-      defaultValue: 'commerce-os/dev/terraform.tfstate',
-      description: 'S3 object key for dev Terraform state.'
-    )
-    string(
-      name: 'DEV_DB_PASSWORD_CREDENTIALS_ID',
-      defaultValue: '',
-      description: 'Optional Jenkins Secret Text credential ID bound to TF_VAR_db_password.'
-    )
-    string(
-      name: 'STOREFRONT_DESIRED_COUNT',
-      defaultValue: '1',
-      description: 'Storefront ECS desired count for dev rollout.'
-    )
-    string(
-      name: 'API_DESIRED_COUNT',
-      defaultValue: '1',
-      description: 'Commerce API ECS desired count for dev rollout.'
-    )
-    string(
-      name: 'APPROVED_DEV_DEPLOY_BRANCH',
-      defaultValue: 'main',
-      description: 'Branch allowed to skip manual approval for dev deploys.'
+      description: 'Also publish a moving dev-latest tag.'
     )
   }
 
@@ -242,12 +120,26 @@ pipeline {
           env.IMAGE_BUILD_TAG = "${params.IMAGE_TAG_PREFIX}-build-${env.BUILD_NUMBER}"
           env.IMAGE_COMBINED_TAG = "${params.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}-b${env.BUILD_NUMBER}"
           env.IMAGE_LATEST_TAG = "${params.IMAGE_TAG_PREFIX}-latest"
-          env.STOREFRONT_CANDIDATE_IMAGE_URI = "${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}"
-          env.API_CANDIDATE_IMAGE_URI = "${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}"
-          env.DETECTED_BRANCH = detectBuildBranch()
+        }
+      }
+    }
 
-          echo "SCM branch: ${env.DETECTED_BRANCH ?: 'unknown'}"
-          echo "Change request: ${env.CHANGE_ID ?: 'none'}"
+    stage('Resolve Storefront Repository') {
+      steps {
+        script {
+          validateAwsRegion(params.AWS_REGION)
+          validateDockerTagPrefix(params.IMAGE_TAG_PREFIX)
+
+          withAwsCredentials {
+            env.STOREFRONT_ECR_REPOSITORY_URL = resolveStorefrontRepositoryUrl(
+              params.STOREFRONT_ECR_REPOSITORY_URL,
+              params.STOREFRONT_ECR_REPOSITORY_NAME,
+              params.AWS_REGION
+            )
+          }
+
+          validateRequiredValue('resolved STOREFRONT_ECR_REPOSITORY_URL', env.STOREFRONT_ECR_REPOSITORY_URL)
+          echo "Storefront repository: ${env.STOREFRONT_ECR_REPOSITORY_URL}"
           echo "Publishing image tags: ${env.IMAGE_SHA_TAG}, ${env.IMAGE_BUILD_TAG}, ${env.IMAGE_COMBINED_TAG}"
           if (params.PUSH_DEV_LATEST) {
             echo "Moving tag enabled: ${env.IMAGE_LATEST_TAG}"
@@ -256,376 +148,50 @@ pipeline {
       }
     }
 
-    stage('Validate Inputs') {
-      steps {
-        script {
-          validateRequiredParam('AWS_REGION')
-          validateRequiredParam('STOREFRONT_ECR_REPOSITORY_URL')
-          validateRequiredParam('COMMERCE_API_ECR_REPOSITORY_URL')
-          validateRequiredParam('IMAGE_TAG_PREFIX')
-          validateRequiredParam('PUBLISH_BRANCH')
-          validateRequiredParam('APPROVED_DEV_DEPLOY_BRANCH')
-
-          if (!(params.IMAGE_TAG_PREFIX ==~ /[a-z0-9][a-z0-9._-]*/)) {
-            error('IMAGE_TAG_PREFIX must be a valid lowercase Docker tag prefix.')
-          }
-
-          requireBranch(params.PUBLISH_BRANCH, 'Phase 0 dev image publishing')
-
-          if (params.PLAN_DEV || params.DEPLOY_DEV || params.BOOTSTRAP_REMOTE_STATE) {
-            validateRequiredParam('TF_BACKEND_BUCKET')
-            validateRequiredParam('TF_BACKEND_KEY')
-          }
-
-          if (!(params.STOREFRONT_DESIRED_COUNT ==~ /[0-9]+/)) {
-            error('STOREFRONT_DESIRED_COUNT must be a non-negative integer.')
-          }
-          if (!(params.API_DESIRED_COUNT ==~ /[0-9]+/)) {
-            error('API_DESIRED_COUNT must be a non-negative integer.')
-          }
-
-          if (params.DEPLOY_DEV || params.BOOTSTRAP_REMOTE_STATE || params.MIGRATE_LOCAL_STATE) {
-            requireBranch(params.APPROVED_DEV_DEPLOY_BRANCH, 'Shared dev environment mutation')
-          }
-        }
-      }
-    }
-
-    stage('Storefront Verification') {
-      steps {
-        dir('apps/storefront') {
-          sh 'pnpm install --frozen-lockfile'
-          sh 'pnpm lint'
-          sh 'pnpm typecheck'
-          sh 'pnpm test'
-          sh 'pnpm build'
-        }
-      }
-    }
-
-    stage('Commerce API Verification') {
-      steps {
-        dir('services/commerce-api') {
-          sh 'uv sync --dev'
-          sh 'uv run pytest'
-          sh 'uv run python -c "from commerce_api.main import app; print(app.title)"'
-        }
-      }
-    }
-
-    stage('Terraform Static Verification') {
-      steps {
-        dir('infra/terraform') {
-          sh 'terraform fmt -check -recursive'
-        }
-        dir('infra/terraform/envs/dev') {
-          sh 'terraform init -backend=false'
-          sh 'terraform validate'
-        }
-      }
-    }
-
-    stage('Build Images') {
+    stage('Build Storefront Image') {
       steps {
         sh(
           label: 'Build storefront image',
           script: """
             docker build \\
               --file apps/storefront/Dockerfile \\
-              --tag '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}' \\
-              --tag '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}' \\
-              --tag '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+              --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}' \\
+              --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}' \\
+              --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
               apps/storefront
 
             if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
               docker tag \\
-                '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
-                '${params.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
-            fi
-          """.stripIndent()
-        )
-        sh(
-          label: 'Build commerce API image',
-          script: """
-            docker build \\
-              --file services/commerce-api/Dockerfile \\
-              --tag '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}' \\
-              --tag '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}' \\
-              --tag '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
-              services/commerce-api
-
-            if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
-              docker tag \\
-                '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
-                '${params.COMMERCE_API_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+                '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+                '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
             fi
           """.stripIndent()
         )
       }
     }
 
-    stage('Push Images') {
-      steps {
-        script {
-          def registries = [
-            params.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0],
-            params.COMMERCE_API_ECR_REPOSITORY_URL.split('/')[0],
-          ].unique()
-
-          def publishImages = {
-            registries.each { registry ->
-              loginToEcr(registry, params.AWS_REGION)
-            }
-            pushImageTags(params.STOREFRONT_ECR_REPOSITORY_URL)
-            pushImageTags(params.COMMERCE_API_ECR_REPOSITORY_URL)
-          }
-
-          withAwsCredentials {
-            publishImages()
-          }
-        }
-      }
-    }
-
-    stage('Remote State Bootstrap') {
-      when {
-        expression { params.BOOTSTRAP_REMOTE_STATE }
-      }
+    stage('Push Storefront Image') {
       steps {
         script {
           withAwsCredentials {
-            dir('infra/terraform/bootstrap/dev-state') {
-              sh 'terraform init -backend=false'
-              sh(
-                label: 'Apply dev remote-state bootstrap',
-                script: """
-                  terraform apply -auto-approve -input=false \\
-                    -var 'aws_region=${params.AWS_REGION}' \\
-                    -var 'bucket_name=${params.TF_BACKEND_BUCKET}'
-                """.stripIndent()
-              )
-            }
-          }
-        }
-      }
-    }
-
-    stage('Terraform Init Remote State') {
-      when {
-        expression { params.PLAN_DEV || params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withDevTerraformCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh(
-                label: 'Initialize dev remote state',
-                script: """
-                  terraform init -input=false \\
-                    -backend-config='bucket=${params.TF_BACKEND_BUCKET}' \\
-                    -backend-config='key=${params.TF_BACKEND_KEY}' \\
-                    -backend-config='region=${params.AWS_REGION}' \\
-                    ${params.MIGRATE_LOCAL_STATE ? '-migrate-state -force-copy' : ''}
-                """.stripIndent()
-              )
-            }
-          }
-        }
-      }
-    }
-
-    stage('Terraform Plan Dev') {
-      when {
-        expression { params.PLAN_DEV || params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withDevTerraformCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh(
-                label: 'Plan migration task definition',
-                script: """
-                  terraform plan -input=false -out=dev-migration-task.tfplan \\
-                    -target=aws_ecs_cluster.main \\
-                    -target=aws_ecs_task_definition.api_migration \\
-                    -var 'aws_region=${params.AWS_REGION}' \\
-                    -var 'storefront_image_uri=${env.STOREFRONT_CANDIDATE_IMAGE_URI}' \\
-                    -var 'api_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
-                    -var 'api_migration_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
-                    -var 'storefront_desired_count=${params.STOREFRONT_DESIRED_COUNT}' \\
-                    -var 'api_desired_count=${params.API_DESIRED_COUNT}'
-                  terraform show -no-color dev-migration-task.tfplan > dev-migration-task.txt
-                """.stripIndent()
-              )
-              sh(
-                label: 'Preview full dev rollout',
-                script: """
-                  terraform plan -input=false -out=dev-rollout-preview.tfplan \\
-                    -var 'aws_region=${params.AWS_REGION}' \\
-                    -var 'storefront_image_uri=${env.STOREFRONT_CANDIDATE_IMAGE_URI}' \\
-                    -var 'api_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
-                    -var 'api_migration_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
-                    -var 'storefront_desired_count=${params.STOREFRONT_DESIRED_COUNT}' \\
-                    -var 'api_desired_count=${params.API_DESIRED_COUNT}'
-                  terraform show -no-color dev-rollout-preview.tfplan > dev-rollout-preview.txt
-                """.stripIndent()
-              )
-            }
-          }
-          archiveArtifacts artifacts: 'infra/terraform/envs/dev/dev-*.txt', allowEmptyArchive: true
-        }
-      }
-    }
-
-    stage('Dev Deploy Approval') {
-      when {
-        expression { params.DEPLOY_DEV && !params.AUTO_APPROVE_DEV_DEPLOY }
-      }
-      steps {
-        input message: "Deploy ${env.IMAGE_COMBINED_TAG} to AWS dev?", ok: 'Deploy'
-      }
-    }
-
-    stage('Apply Migration Task Definition') {
-      when {
-        expression { params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withDevTerraformCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh 'terraform apply -input=false dev-migration-task.tfplan'
-            }
-          }
-        }
-      }
-    }
-
-    stage('Run Database Migration') {
-      when {
-        expression { params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withAwsCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh(
-                label: 'Run Alembic migration task',
-                script: '''
-                  set -eu
-
-                  CLUSTER_NAME="$(terraform output -raw ecs_cluster_name)"
-                  TASK_DEFINITION="$(terraform output -raw api_migration_task_definition_arn)"
-                  CONTAINER_NAME="$(terraform output -raw api_migration_container_name)"
-                  SUBNET_IDS="$(terraform output -json public_subnet_ids | jq -r 'join(",")')"
-                  SECURITY_GROUP_ID="$(terraform output -raw ecs_task_security_group_id)"
-
-                  aws ecs run-task \
-                    --cluster "$CLUSTER_NAME" \
-                    --launch-type FARGATE \
-                    --task-definition "$TASK_DEFINITION" \
-                    --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_IDS],securityGroups=[$SECURITY_GROUP_ID],assignPublicIp=ENABLED}" \
-                    > migration-run-task.json
-
-                  if [ "$(jq -r '.failures | length' migration-run-task.json)" != "0" ]; then
-                    cat migration-run-task.json
-                    exit 1
-                  fi
-
-                  TASK_ARN="$(jq -r '.tasks[0].taskArn' migration-run-task.json)"
-                  if [ -z "$TASK_ARN" ] || [ "$TASK_ARN" = "null" ]; then
-                    cat migration-run-task.json
-                    exit 1
-                  fi
-
-                  aws ecs wait tasks-stopped --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN"
-                  aws ecs describe-tasks --cluster "$CLUSTER_NAME" --tasks "$TASK_ARN" > migration-describe-task.json
-
-                  EXIT_CODE="$(jq -r --arg name "$CONTAINER_NAME" '.tasks[0].containers[] | select(.name == $name) | .exitCode // empty' migration-describe-task.json)"
-                  if [ "$EXIT_CODE" != "0" ]; then
-                    cat migration-describe-task.json
-                    exit 1
-                  fi
-                '''.stripIndent()
-              )
-            }
-          }
-          archiveArtifacts artifacts: 'infra/terraform/envs/dev/migration-*.json', allowEmptyArchive: true
-        }
-      }
-    }
-
-    stage('Apply ECS Rollout') {
-      when {
-        expression { params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withDevTerraformCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh(
-                label: 'Apply dev ECS rollout',
-                script: """
-                  terraform plan -input=false -out=dev-rollout.tfplan \\
-                    -var 'aws_region=${params.AWS_REGION}' \\
-                    -var 'storefront_image_uri=${env.STOREFRONT_CANDIDATE_IMAGE_URI}' \\
-                    -var 'api_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
-                    -var 'api_migration_image_uri=${env.API_CANDIDATE_IMAGE_URI}' \\
-                    -var 'storefront_desired_count=${params.STOREFRONT_DESIRED_COUNT}' \\
-                    -var 'api_desired_count=${params.API_DESIRED_COUNT}'
-                  terraform apply -input=false dev-rollout.tfplan
-                """.stripIndent()
-              )
-            }
-          }
-        }
-      }
-    }
-
-    stage('ECS Stability') {
-      when {
-        expression { params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withAwsCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh(
-                label: 'Wait for dev ECS services',
-                script: '''
-                  set -eu
-
-                  CLUSTER_NAME="$(terraform output -raw ecs_cluster_name)"
-                  STOREFRONT_SERVICE="$(terraform output -raw storefront_service_name)"
-                  API_SERVICE="$(terraform output -raw api_service_name)"
-
-                  aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$STOREFRONT_SERVICE"
-                  aws ecs wait services-stable --cluster "$CLUSTER_NAME" --services "$API_SERVICE"
-                '''.stripIndent()
-              )
-            }
-          }
-        }
-      }
-    }
-
-    stage('Smoke Test Dev') {
-      when {
-        expression { params.DEPLOY_DEV }
-      }
-      steps {
-        script {
-          withAwsCredentials {
-            dir('infra/terraform/envs/dev') {
-              sh(
-                label: 'Run ALB smoke tests',
-                script: '''
-                  set -eu
-                  ALB_DNS_NAME="$(terraform output -raw alb_dns_name)"
-                  bash ../../../../platform/jenkins/scripts/smoke-dev-alb.sh "http://$ALB_DNS_NAME"
-                '''.stripIndent()
-              )
-            }
+            def registry = env.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0]
+            sh(
+              label: "Authenticate Docker to ${registry}",
+              script: """
+                aws ecr get-login-password --region '${params.AWS_REGION}' | docker login --username AWS --password-stdin '${registry}'
+              """.stripIndent()
+            )
+            sh(
+              label: 'Push storefront image tags',
+              script: """
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}'
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}'
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
+                if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
+                  docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+                fi
+              """.stripIndent()
+            )
           }
         }
       }
@@ -634,7 +200,7 @@ pipeline {
 
   post {
     success {
-      echo "Published storefront and commerce API images with ${env.IMAGE_COMBINED_TAG}."
+      echo "Published storefront image with ${env.IMAGE_COMBINED_TAG}."
     }
   }
 }
