@@ -6,6 +6,10 @@ Trigger the CommerceOS Jenkins pipeline automatically when changes land on the
 GitHub `main` branch, whether the change arrives through a pull request merge
 or a direct push.
 
+Current status: deferred while the active Jenkinsfile is narrowed to
+storefront-only Docker image publishing. GitHub trigger branch guards and deploy
+gates should be revisited after the simple ECR push path is proven in Jenkins.
+
 The Jenkins controller still runs locally at `http://localhost:9090` in Phase 0.
 Because GitHub cannot send webhooks directly to `localhost`, this unit must use
 one of the supported local-controller trigger paths:
@@ -109,7 +113,8 @@ Document and install these plugins if they are not already available:
 - Configure build strategies so branch indexing does not run deployments.
 - Enable the GitHub hook trigger for SCM polling.
 - Keep job properties or default parameters aligned with the Jenkinsfile:
-  - ECR repository URLs are configured in Jenkins parameters or job defaults
+  - ECR repository URLs are configured in Jenkins parameters or resolved from
+    AWS ECR by repository name
   - `PLAN_DEV=false`
   - `DEPLOY_DEV=false`
   - `BOOTSTRAP_REMOTE_STATE=false`

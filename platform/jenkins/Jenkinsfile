@@ -5,14 +5,12 @@ def validateRequiredValue(String name, String value) {
 }
 
 def validateAwsRegion(String region) {
-  validateRequiredValue('AWS_REGION', region)
   if (!(region ==~ /[a-z]{2}(-[a-z]+)+-[0-9]+/)) {
     error('AWS_REGION must look like us-west-2.')
   }
 }
 
 def validateDockerTagPrefix(String prefix) {
-  validateRequiredValue('IMAGE_TAG_PREFIX', prefix)
   if (!(prefix ==~ /[a-z0-9][a-z0-9._-]*/)) {
     error('IMAGE_TAG_PREFIX must be a valid lowercase Docker tag prefix.')
   }
@@ -25,13 +23,8 @@ def validateEcrRepositoryName(String value) {
   }
 }
 
-def resolveStorefrontRepositoryUrl(String configuredUrl, String repositoryName, String region) {
-  if (configuredUrl?.trim()) {
-    return configuredUrl.trim()
-  }
-
-  def effectiveRepositoryName = repositoryName?.trim() ?: 'commerce-os-dev-storefront'
-  validateEcrRepositoryName(effectiveRepositoryName)
+def resolveStorefrontRepositoryUrl(String repositoryName, String region) {
+  validateEcrRepositoryName(repositoryName)
 
   return sh(
     label: 'Resolve storefront ECR repository URL',
@@ -39,24 +32,11 @@ def resolveStorefrontRepositoryUrl(String configuredUrl, String repositoryName, 
     script: """
       aws ecr describe-repositories \\
         --region '${region}' \\
-        --repository-names '${effectiveRepositoryName}' \\
+        --repository-names '${repositoryName}' \\
         --query 'repositories[0].repositoryUri' \\
         --output text
     """.stripIndent()
   ).trim()
-}
-
-def withAwsCredentials(Closure body) {
-  if (params.AWS_CREDENTIALS_ID?.trim()) {
-    withCredentials([[
-      $class: 'AmazonWebServicesCredentialsBinding',
-      credentialsId: params.AWS_CREDENTIALS_ID
-    ]]) {
-      body()
-    }
-  } else {
-    body()
-  }
 }
 
 pipeline {
@@ -69,41 +49,11 @@ pipeline {
     timestamps()
   }
 
-  parameters {
-    string(
-      name: 'AWS_REGION',
-      defaultValue: 'us-west-2',
-      description: 'AWS region containing the storefront ECR repository.'
-    )
-    string(
-      name: 'STOREFRONT_ECR_REPOSITORY_URL',
-      defaultValue: '',
-      description: 'Optional full storefront ECR repository URL. Leave blank to resolve it from AWS by repository name.'
-    )
-    string(
-      name: 'STOREFRONT_ECR_REPOSITORY_NAME',
-      defaultValue: 'commerce-os-dev-storefront',
-      description: 'Storefront ECR repository name used when STOREFRONT_ECR_REPOSITORY_URL is blank.'
-    )
-    string(
-      name: 'IMAGE_TAG_PREFIX',
-      defaultValue: 'dev',
-      description: 'Environment or channel prefix used for published image tags.'
-    )
-    string(
-      name: 'AWS_CREDENTIALS_ID',
-      defaultValue: '',
-      description: 'Optional Jenkins AWS credentials ID. Leave blank when the agent already has an AWS role.'
-    )
-    booleanParam(
-      name: 'PUSH_DEV_LATEST',
-      defaultValue: true,
-      description: 'Also publish a moving dev-latest tag.'
-    )
-  }
-
   environment {
     DOCKER_BUILDKIT = '1'
+    AWS_REGION = 'us-west-2'
+    STOREFRONT_ECR_REPOSITORY_NAME = 'commerce-os-dev-storefront'
+    IMAGE_TAG_PREFIX = 'dev'
   }
 
   stages {
@@ -116,10 +66,10 @@ pipeline {
             returnStdout: true,
             script: 'git rev-parse --short=12 HEAD'
           ).trim()
-          env.IMAGE_SHA_TAG = "${params.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}"
-          env.IMAGE_BUILD_TAG = "${params.IMAGE_TAG_PREFIX}-build-${env.BUILD_NUMBER}"
-          env.IMAGE_COMBINED_TAG = "${params.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}-b${env.BUILD_NUMBER}"
-          env.IMAGE_LATEST_TAG = "${params.IMAGE_TAG_PREFIX}-latest"
+          env.IMAGE_SHA_TAG = "${env.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}"
+          env.IMAGE_BUILD_TAG = "${env.IMAGE_TAG_PREFIX}-build-${env.BUILD_NUMBER}"
+          env.IMAGE_COMBINED_TAG = "${env.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}-b${env.BUILD_NUMBER}"
+          env.IMAGE_LATEST_TAG = "${env.IMAGE_TAG_PREFIX}-latest"
         }
       }
     }
@@ -127,23 +77,18 @@ pipeline {
     stage('Resolve Storefront Repository') {
       steps {
         script {
-          validateAwsRegion(params.AWS_REGION)
-          validateDockerTagPrefix(params.IMAGE_TAG_PREFIX)
+          validateAwsRegion(env.AWS_REGION)
+          validateDockerTagPrefix(env.IMAGE_TAG_PREFIX)
 
-          withAwsCredentials {
-            env.STOREFRONT_ECR_REPOSITORY_URL = resolveStorefrontRepositoryUrl(
-              params.STOREFRONT_ECR_REPOSITORY_URL,
-              params.STOREFRONT_ECR_REPOSITORY_NAME,
-              params.AWS_REGION
-            )
-          }
+          env.STOREFRONT_ECR_REPOSITORY_URL = resolveStorefrontRepositoryUrl(
+            env.STOREFRONT_ECR_REPOSITORY_NAME,
+            env.AWS_REGION
+          )
 
           validateRequiredValue('resolved STOREFRONT_ECR_REPOSITORY_URL', env.STOREFRONT_ECR_REPOSITORY_URL)
           echo "Storefront repository: ${env.STOREFRONT_ECR_REPOSITORY_URL}"
           echo "Publishing image tags: ${env.IMAGE_SHA_TAG}, ${env.IMAGE_BUILD_TAG}, ${env.IMAGE_COMBINED_TAG}"
-          if (params.PUSH_DEV_LATEST) {
-            echo "Moving tag enabled: ${env.IMAGE_LATEST_TAG}"
-          }
+          echo "Moving tag enabled: ${env.IMAGE_LATEST_TAG}"
         }
       }
     }
@@ -160,11 +105,9 @@ pipeline {
               --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
               apps/storefront
 
-            if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
-              docker tag \\
-                '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
-                '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
-            fi
+            docker tag \\
+              '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+              '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
           """.stripIndent()
         )
       }
@@ -173,26 +116,22 @@ pipeline {
     stage('Push Storefront Image') {
       steps {
         script {
-          withAwsCredentials {
-            def registry = env.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0]
-            sh(
-              label: "Authenticate Docker to ${registry}",
-              script: """
-                aws ecr get-login-password --region '${params.AWS_REGION}' | docker login --username AWS --password-stdin '${registry}'
-              """.stripIndent()
-            )
-            sh(
-              label: 'Push storefront image tags',
-              script: """
-                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}'
-                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}'
-                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
-                if [ '${params.PUSH_DEV_LATEST}' = 'true' ]; then
-                  docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
-                fi
-              """.stripIndent()
-            )
-          }
+          def registry = env.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0]
+          sh(
+            label: "Authenticate Docker to ${registry}",
+            script: """
+              aws ecr get-login-password --region '${env.AWS_REGION}' | docker login --username AWS --password-stdin '${registry}'
+            """.stripIndent()
+          )
+          sh(
+            label: 'Push storefront image tags',
+            script: """
+              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}'
+              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}'
+              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
+              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+            """.stripIndent()
+          )
         }
       }
     }

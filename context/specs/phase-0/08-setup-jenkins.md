@@ -8,9 +8,10 @@ turning one unit into an all-at-once deployment project.
 Unit 08 is split into smaller implementation specs:
 
 1. `08a-jenkins-ci-image-publishing.md`
-   - verify storefront, API, and Terraform checks
-   - build Docker images
-   - push storefront and API images to dev ECR
+   - current narrow focus: build the storefront Docker image
+   - resolve the storefront ECR repository URL from AWS when needed
+   - push the storefront image to dev ECR
+   - defer API image publishing and broader checks until this path is proven
    - do not deploy ECS or mutate Terraform infrastructure
 2. `08b-remote-state-dev-deploy.md`
    - add remote Terraform state for the dev environment
@@ -37,12 +38,14 @@ AWS Keycloak provisioning.
 
 This step proves the repository can produce deployable artifacts:
 
-- app tests and builds pass
-- Docker images build locally and in Jenkins
-- images are pushed to the existing Unit 07 ECR repositories
+- the storefront Docker image builds in Jenkins
+- the storefront ECR repository URL can be resolved from AWS
+- the storefront image is pushed to the existing Unit 07 ECR repository
 
 It avoids Terraform apply, RDS migration, ECS rollout, and Keycloak auth so the
-first Jenkins increment is easy to verify.
+first Jenkins increment is easy to verify. API image publishing, frontend test
+gates, backend test gates, and Terraform static checks should be reintroduced
+after the storefront image push is working end to end.
 
 ### 08B Second: Remote State and Dev Deploy
 

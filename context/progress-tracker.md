@@ -15,14 +15,16 @@
   - [ ] 08C Trigger Jenkins Pipeline From GitHub
 - [ ] 09 Setup Logger
 
-Current unit: 08C Trigger Jenkins Pipeline From GitHub
+Current unit: 08A Jenkins CI and Image Publishing, narrowed to storefront image
+publishing only.
 
-Status: 08C is implemented in the Jenkinsfile and Jenkins operator docs. Live
-GitHub webhook or SCM-polling verification is still pending because the local
-Jenkins job, tunnel, and Jenkins credentials must be configured outside the
-repository. 08B is implemented and locally verified where possible; real
-Jenkins/AWS execution is still pending for image push, remote-state bootstrap,
-Terraform apply, ECS migration, ECS rollout, and ALB smoke tests.
+Status: The active Jenkinsfile has been simplified to one AWS delivery path:
+build the `apps/storefront` Docker image, resolve the storefront ECR repository
+URL from AWS using a fixed dev repository name, and push storefront image tags
+to ECR without requiring build parameters. Commerce API image publishing,
+Terraform checks, remote-state bootstrap, ECS deploy, migration, stability
+waits, smoke tests, and GitHub trigger/deploy branch gates are deferred until
+the storefront image push is proven in a real Jenkins run.
 
 Completed scope:
 
@@ -71,6 +73,13 @@ Completed scope:
 - Added Jenkins branch detection and fail-fast guards so the Phase 0
   image-publishing job only runs from the configured publish branch and shared
   dev mutations only run from the approved deploy branch.
+- Added Jenkins ECR repository URL resolution through AWS
+  `describe-repositories` for the fixed dev storefront repository.
+- Simplified the active Jenkinsfile back to storefront-only Docker image build
+  and ECR push while deferring API, Terraform, ECS deploy, and smoke-test stages.
+- Removed active Jenkins build parameters for the storefront-only path; dev
+  region, ECR repository name, tag prefix, and `dev-latest` behavior are fixed
+  in source for now.
 - Documented the Unit 08C GitHub trigger workflow, including Multibranch and
   single Pipeline setup, temporary tunnel webhook delivery, SCM polling
   fallback, plugin requirements, branch safety, and troubleshooting.
@@ -81,16 +90,16 @@ Open questions:
 
 - What reachable Keycloak issuer should the AWS dev storefront use for
   sign-in/sign-out verification when auth smoke tests are enabled?
-- The combined 08A/08B Jenkins pipeline still needs a real run with dev ECR
-  URLs and AWS credentials to validate image pushes, remote state, deploy,
-  migration, ECS stability, and ALB smoke tests.
-- Unit 08C still needs a real GitHub `main` push or PR merge to verify webhook
-  delivery through a temporary tunnel, or SCM polling detection, against the
-  configured local Jenkins job.
+- The storefront-only Jenkins pipeline still needs a real run with AWS
+  credentials to validate ECR repository URL resolution and image push.
+- Jenkins may need one run or a job configuration refresh to drop stale
+  parameter definitions from the previous Jenkinsfile.
+- API image publishing, Terraform static checks, remote state, deploy,
+  migration, ECS stability, ALB smoke tests, and Unit 08C GitHub trigger
+  verification remain deferred.
 
-Next unit: configure the local Jenkins job and GitHub webhook or SCM polling,
-run the combined Jenkins pipeline against AWS dev, and address any runtime
-deploy issues before moving to 09 Setup Logger.
+Next unit: run the simplified storefront-only Jenkins pipeline against AWS dev,
+then reintroduce API image publishing and verification in a small follow-up.
 
 ## Phase 1
 
