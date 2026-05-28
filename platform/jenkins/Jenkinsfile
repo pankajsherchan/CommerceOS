@@ -23,6 +23,19 @@ def validateEcrRepositoryName(String value) {
   }
 }
 
+def withJenkinsAwsCredentials(String credentialsId, Closure body) {
+  validateRequiredValue('AWS_CREDENTIALS_ID', credentialsId)
+
+  withCredentials([[
+    $class: 'AmazonWebServicesCredentialsBinding',
+    credentialsId: credentialsId.trim(),
+    accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+    secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+  ]]) {
+    body()
+  }
+}
+
 def resolveStorefrontRepositoryUrl(String repositoryName, String region) {
   validateEcrRepositoryName(repositoryName)
 
@@ -52,19 +65,20 @@ pipeline {
   environment {
     DOCKER_BUILDKIT = '1'
     AWS_REGION = 'us-west-2'
+    AWS_CREDENTIALS_ID = 'aws-dev-credential'
     STOREFRONT_ECR_REPOSITORY_NAME = 'commerce-os-dev-storefront'
     IMAGE_TAG_PREFIX = 'dev'
   }
 
   stages {
-     stage('Verify AWS CLI') {
-        steps {
-          sh '''
-              aws --version
-          '''
-        }  
-     }
-
+    stage('Verify AWS CLI') {
+      steps {
+        sh '''
+            aws --version
+        '''
+        }
+      }
+      
 
     stage('Checkout') {
       steps {
@@ -83,7 +97,25 @@ pipeline {
       }
     }
 
-   
+    stage('Verify AWS Access') {
+      steps {
+        script {
+          validateAwsRegion(env.AWS_REGION)
+
+          withJenkinsAwsCredentials(env.AWS_CREDENTIALS_ID) {
+            sh(
+              label: 'Verify AWS caller identity',
+              script: """
+                aws sts get-caller-identity \\
+                  --region '${env.AWS_REGION}' \\
+                  --query 'Account' \\
+                  --output text >/dev/null
+              """.stripIndent()
+            )
+          }
+        }
+      }
+    }
 
     stage('Resolve Storefront Repository') {
       steps {
@@ -91,10 +123,12 @@ pipeline {
           validateAwsRegion(env.AWS_REGION)
           validateDockerTagPrefix(env.IMAGE_TAG_PREFIX)
 
-          env.STOREFRONT_ECR_REPOSITORY_URL = resolveStorefrontRepositoryUrl(
-            env.STOREFRONT_ECR_REPOSITORY_NAME,
-            env.AWS_REGION
-          )
+          withJenkinsAwsCredentials(env.AWS_CREDENTIALS_ID) {
+            env.STOREFRONT_ECR_REPOSITORY_URL = resolveStorefrontRepositoryUrl(
+              env.STOREFRONT_ECR_REPOSITORY_NAME,
+              env.AWS_REGION
+            )
+          }
 
           validateRequiredValue('resolved STOREFRONT_ECR_REPOSITORY_URL', env.STOREFRONT_ECR_REPOSITORY_URL)
           echo "Storefront repository: ${env.STOREFRONT_ECR_REPOSITORY_URL}"
@@ -128,21 +162,23 @@ pipeline {
       steps {
         script {
           def registry = env.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0]
-          sh(
-            label: "Authenticate Docker to ${registry}",
-            script: """
-              aws ecr get-login-password --region '${env.AWS_REGION}' | docker login --username AWS --password-stdin '${registry}'
-            """.stripIndent()
-          )
-          sh(
-            label: 'Push storefront image tags',
-            script: """
-              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}'
-              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}'
-              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
-              docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
-            """.stripIndent()
-          )
+          withJenkinsAwsCredentials(env.AWS_CREDENTIALS_ID) {
+            sh(
+              label: "Authenticate Docker to ${registry}",
+              script: """
+                aws ecr get-login-password --region '${env.AWS_REGION}' | docker login --username AWS --password-stdin '${registry}'
+              """.stripIndent()
+            )
+            sh(
+              label: 'Push storefront image tags',
+              script: """
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}'
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}'
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
+                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+              """.stripIndent()
+            )
+          }
         }
       }
     }
