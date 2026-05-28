@@ -16,10 +16,10 @@ def validateDockerTagPrefix(String prefix) {
   }
 }
 
-def validateEcrRepositoryName(String value) {
-  validateRequiredValue('STOREFRONT_ECR_REPOSITORY_NAME', value)
+def validateEcrRepositoryName(String name, String value) {
+  validateRequiredValue(name, value)
   if (!(value ==~ /[a-z0-9]+([._\/-][a-z0-9]+)*/)) {
-    error('STOREFRONT_ECR_REPOSITORY_NAME must be a valid ECR repository name.')
+    error("${name} must be a valid ECR repository name.")
   }
 }
 
@@ -36,11 +36,11 @@ def withJenkinsAwsCredentials(String credentialsId, Closure body) {
   }
 }
 
-def resolveStorefrontRepositoryUrl(String repositoryName, String region) {
-  validateEcrRepositoryName(repositoryName)
+def resolveEcrRepositoryUrl(String repositoryName, String region, String label) {
+  validateEcrRepositoryName(label, repositoryName)
 
   return sh(
-    label: 'Resolve storefront ECR repository URL',
+    label: "Resolve ${label} ECR repository URL",
     returnStdout: true,
     script: """
       aws ecr describe-repositories \\
@@ -67,6 +67,7 @@ pipeline {
     AWS_REGION = 'us-west-2'
     AWS_CREDENTIALS_ID = 'aws-dev-credential'
     STOREFRONT_ECR_REPOSITORY_NAME = 'commerce-os-dev-storefront'
+    API_ECR_REPOSITORY_NAME = 'commerce-os-dev-commerce-api'
     IMAGE_TAG_PREFIX = 'dev'
   }
 
@@ -76,9 +77,8 @@ pipeline {
         sh '''
             aws --version
         '''
-        }
       }
-      
+    }
 
     stage('Checkout') {
       steps {
@@ -89,8 +89,6 @@ pipeline {
             returnStdout: true,
             script: 'git rev-parse --short=12 HEAD'
           ).trim()
-          env.IMAGE_SHA_TAG = "${env.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}"
-          env.IMAGE_BUILD_TAG = "${env.IMAGE_TAG_PREFIX}-build-${env.BUILD_NUMBER}"
           env.IMAGE_COMBINED_TAG = "${env.IMAGE_TAG_PREFIX}-${env.GIT_SHORT_SHA}-b${env.BUILD_NUMBER}"
           env.IMAGE_LATEST_TAG = "${env.IMAGE_TAG_PREFIX}-latest"
         }
@@ -117,22 +115,30 @@ pipeline {
       }
     }
 
-    stage('Resolve Storefront Repository') {
+    stage('Resolve ECR Repositories') {
       steps {
         script {
           validateAwsRegion(env.AWS_REGION)
           validateDockerTagPrefix(env.IMAGE_TAG_PREFIX)
 
           withJenkinsAwsCredentials(env.AWS_CREDENTIALS_ID) {
-            env.STOREFRONT_ECR_REPOSITORY_URL = resolveStorefrontRepositoryUrl(
+            env.STOREFRONT_ECR_REPOSITORY_URL = resolveEcrRepositoryUrl(
               env.STOREFRONT_ECR_REPOSITORY_NAME,
-              env.AWS_REGION
+              env.AWS_REGION,
+              'storefront'
+            )
+            env.API_ECR_REPOSITORY_URL = resolveEcrRepositoryUrl(
+              env.API_ECR_REPOSITORY_NAME,
+              env.AWS_REGION,
+              'commerce API'
             )
           }
 
           validateRequiredValue('resolved STOREFRONT_ECR_REPOSITORY_URL', env.STOREFRONT_ECR_REPOSITORY_URL)
+          validateRequiredValue('resolved API_ECR_REPOSITORY_URL', env.API_ECR_REPOSITORY_URL)
           echo "Storefront repository: ${env.STOREFRONT_ECR_REPOSITORY_URL}"
-          echo "Publishing image tags: ${env.IMAGE_SHA_TAG}, ${env.IMAGE_BUILD_TAG}, ${env.IMAGE_COMBINED_TAG}"
+          echo "Commerce API repository: ${env.API_ECR_REPOSITORY_URL}"
+          echo "Publishing image tag: ${env.IMAGE_COMBINED_TAG}"
           echo "Moving tag enabled: ${env.IMAGE_LATEST_TAG}"
         }
       }
@@ -145,20 +151,30 @@ pipeline {
           script: """
             docker build \\
               --file apps/storefront/Dockerfile \\
-              --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}' \\
-              --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}' \\
               --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+              --tag '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}' \\
               apps/storefront
-
-            docker tag \\
-              '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
-              '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
           """.stripIndent()
         )
       }
     }
 
-    stage('Push Storefront Image') {
+    stage('Build Commerce API Image') {
+      steps {
+        sh(
+          label: 'Build commerce API image',
+          script: """
+            docker build \\
+              --file services/commerce-api/Dockerfile \\
+              --tag '${env.API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}' \\
+              --tag '${env.API_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}' \\
+              services/commerce-api
+          """.stripIndent()
+        )
+      }
+    }
+
+    stage('Push Images') {
       steps {
         script {
           def registry = env.STOREFRONT_ECR_REPOSITORY_URL.split('/')[0]
@@ -172,10 +188,15 @@ pipeline {
             sh(
               label: 'Push storefront image tags',
               script: """
-                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_SHA_TAG}'
-                docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_BUILD_TAG}'
                 docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
                 docker push '${env.STOREFRONT_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
+              """.stripIndent()
+            )
+            sh(
+              label: 'Push commerce API image tags',
+              script: """
+                docker push '${env.API_ECR_REPOSITORY_URL}:${env.IMAGE_COMBINED_TAG}'
+                docker push '${env.API_ECR_REPOSITORY_URL}:${env.IMAGE_LATEST_TAG}'
               """.stripIndent()
             )
           }
@@ -186,7 +207,7 @@ pipeline {
 
   post {
     success {
-      echo "Published storefront image with ${env.IMAGE_COMBINED_TAG}."
+      echo "Published storefront and commerce API images with ${env.IMAGE_COMBINED_TAG}."
     }
   }
 }
