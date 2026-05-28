@@ -65,12 +65,15 @@ pipeline {
 
                 unzip awscliv2.zip
 
-                sudo ./aws/install
+                ./aws/install \
+                --install-dir $HOME/.local/aws-cli \
+                --bin-dir $HOME/.local/bin
 
                 aws --version
             '''
         }
     }  
+
 
     stage('Checkout') {
       steps {
@@ -88,6 +91,8 @@ pipeline {
         }
       }
     }
+
+   
 
     stage('Resolve Storefront Repository') {
       steps {
